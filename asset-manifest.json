@@ -1,8 +1,8 @@
 {
   "files": {
-    "main.js": "/TouatiAch/Change-Management-Platform-Web-Portal/static/js/main.2fe7c8ef.js",
-    "index.html": "/TouatiAch/Change-Management-Platform-Web-Portal/index.html",
-    "main.2fe7c8ef.js.map": "/TouatiAch/Change-Management-Platform-Web-Portal/static/js/main.2fe7c8ef.js.map"
+    "main.js": "/Change-Management-Platform-Web-Portal/static/js/main.2fe7c8ef.js",
+    "index.html": "/Change-Management-Platform-Web-Portal/index.html",
+    "main.2fe7c8ef.js.map": "/Change-Management-Platform-Web-Portal/static/js/main.2fe7c8ef.js.map"
   },
   "entrypoints": [
     "static/js/main.2fe7c8ef.js"
