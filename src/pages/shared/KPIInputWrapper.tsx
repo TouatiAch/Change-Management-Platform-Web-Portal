@@ -3,7 +3,7 @@ import ProjectCarousel from "../../components/ProjectCarousel";
 import axios from "axios";
 import { getAccessToken } from "../../auth/getToken";
 import { msalInstance } from "../../auth/msalInstance";
-import InputFormatted from "../../components/InputFormatted";
+import InputFormatted from "../../components/kpiEntry/InputFormatted";
 
 const LISTS_CONFIG_KEY = "cmConfigLists";
 

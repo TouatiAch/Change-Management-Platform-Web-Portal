@@ -1,14 +1,9 @@
 import React, { useState} from "react";
-import ExcelParser from "../components/ExcelParser";
-import SiteResolver from "../components/SiteResolver";
-import SharePointUploader from "../components/SharePointUploader";
-import LogsViewer from "../components/LogsViewer";
-import ExpectedColumnsDisplay from "../components/ExpectedColumnsDisplay";
-import ColumnValidator from "../components/ColumnValidator";
-import UploadQuestionTemplates from "../components/UploadQuestionTemplates";
+import ExcelParser from "../components/DataUpload/ExcelParser";
+import ColumnValidator from "../components/DataUpload/ColumnValidator";
 import { useNavigate } from "react-router-dom";
 import projectsIcon from "../assets/images/projectsIcon.png";
-import EnsureSharePointLists from "../components/EnsureSharePointLists";
+import EnsureSharePointLists from "../components/DataUpload/EnsureSharePointLists";
 import harnessBg from "../assets/images/harness-bg.png";
 import TopMenu from "../components/TopMenu";
 import { getAccessToken } from "../auth/getToken";
@@ -17,6 +12,11 @@ import { getConfig } from "../services/configService";
 import axios from "axios";
 
 import { trackEvent } from '../analytics/ga4';
+import SiteResolver from "../components/DataUpload/SiteResolver";
+import UploadQuestionTemplates from "../components/DataUpload/UploadQuestionTemplates";
+import SharePointUploader from "../components/DataUpload/SharePointUploader";
+import ExpectedColumnsDisplay from "../components/DataUpload/ExpectedColumnsDisplay";
+import LogsViewer from "../components/DataUpload/LogsViewer";
 
 
 const SharePointUploaderPage: React.FC = () => {

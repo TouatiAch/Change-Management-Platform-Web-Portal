@@ -8,8 +8,7 @@ export const msalConfig = {
 //app registration for uit
     //clientId: "17d45425-fdd2-42ea-aa96-37a92dc49794",
     //authority: "https://login.microsoftonline.com/e030b0c2-7438-480c-8b0c-0d7c3ae5f098", 
-    redirectUri: "https://touatiach.github.io/Change-Management-Platform-Web-Portal/",
-    //redirectUri: "http://localhost:3000",
+    redirectUri: process.env.REACT_APP_REDIRECT_URI!,
   },
   cache: {
     cacheLocation: "sessionStorage",

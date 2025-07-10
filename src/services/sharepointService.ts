@@ -83,16 +83,17 @@ export async function getAllListItems(
 export async function deleteAllItems(
   siteId: string,
   listId: string,
-  token: string
-): Promise<void> {
+  token: string,
+) {
+  // 1) fetch all existing items
   const items = await getAllListItems(siteId, listId, token);
-  for (const item of items) {
-    await fetch(
-      `${GRAPH_BASE}/sites/${siteId}/lists/${listId}/items/${item.id}`,
-      { method: "DELETE", headers: { Authorization: `Bearer ${token}` } }
-    );
+  const ids = items.map(i => i.id);
+
+  // 2) bulk‐delete them
+  if (ids.length) {
+    await bulkDeleteItems(siteId, listId, token, ids, /* concurrency */ 2);
+    console.log(`[BULK DELETED] ${ids.length} items`);
   }
-  console.log(`[CLEARED_LIST] => ${items.length} items deleted`);
 }
 
 export async function getExistingColumns(
@@ -221,6 +222,32 @@ export async function bulkCreateItems(
   const batches = chunkArray(reqs, 20);
   await limitedMap(batches, concurrency, batch => uploadBatch(batch, token));
 }
+/**
+ * Bulk‐deletes up to 20 items per Graph batch.
+ */
+export async function bulkDeleteItems(
+  siteId: string,
+  listId: string,
+  token: string,
+  itemIds: string[],
+  concurrency = 2,
+) {
+  // 1) build one DELETE request entry per item
+  const reqs = itemIds.map((itemId, i) => ({
+    id: `${i}`,
+    method: "DELETE" as const,
+    // note: must start with a leading slash
+    url: `/sites/${siteId}/lists/${listId}/items/${itemId}`,
+    headers: {},       // no Content-Type needed for DELETE
+  }));
+
+  // 2) batch into chunks of ≤20
+  const batches = chunkArray(reqs, 20);
+
+  // 3) fire them off in parallel
+  await limitedMap(batches, concurrency, batch => uploadBatch(batch, token));
+}
+
 export async function insertItem(
   siteId: string,
   listId: string,

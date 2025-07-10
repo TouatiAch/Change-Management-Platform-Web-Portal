@@ -84,3 +84,51 @@ export interface MonthlyKPIItem { /* … */ }
 export interface FollowCostItem { /* … */ }
 export interface IProject { /* … */ }
 export interface AreaImage { projectId: string; image: string; }
+
+// src/types.ts
+export type IntervalUnit = "Minutes" | "Hours" | "Days";
+
+export interface QuestionState {
+  changeNumber: string;
+  area: string;
+  id: string;
+  questionId: string;
+  description: string;
+  action: string;
+  responsibleEmail: string;
+  cc?: string;
+  responsibleRole: string;
+  triggerOn: string;
+  triggerChoice: string;
+  sendIntervalValue: number;
+  sendIntervalUnit: IntervalUnit;
+  emailbody?: string;
+  emailsubject?: string;
+  lastSent?: string;
+  responseReceived: boolean;
+  conversationId?: string;
+  internetMessageId?: string;
+  lastChecked?: string;
+  latestResponsePreview?: string;
+  replySubject?: string;
+  replyBody?: string;
+  replyReceivedDate?: string;
+}
+
+export interface IProject {
+  id: string;
+  displayName: string;
+  logo?: string;
+  mapping: {
+    implementation: string;
+    changeQuestionStatusListId?: string;
+  };
+}
+
+export interface ListsConfig {
+  siteId: string;
+  questionsListId: string;
+  monthlyListId: string;
+  followCostListId: string;
+  projects: IProject[];
+}
