@@ -132,3 +132,28 @@ export interface ListsConfig {
   followCostListId: string;
   projects: IProject[];
 }
+export interface FollowCostItem {
+  ID: string;                  // SharePoint item id
+  Project: string;             // fields.Project
+  Area: string;                // fields.Area
+  Carline: string;             // fields.Carline
+  InitiationReasons: string;   // fields.InitiationReasons
+  BucketID: string;            // fields.BucketID
+  Date: string;                // fields.Date (YYYY-MM-DD)
+  Statut: string;              // fields.Statut
+  Quantity: number;            // fields.Quantity
+  NettValue: number;           // fields.NettValue
+  TotalNettValue: number;      // fields.TotalNettValue
+  Currency: string;            // fields.Currency
+  BucketResponsible: string;   // fields.BucketResponsible
+  PostnameID: string;          // fields.PostnameID
+  Topic: string;               // fields.Topic
+}
+export type FilterMode =
+  | "year"
+  | "quarter"
+  | "month"
+  | "day"
+  | "weekOfMonth"
+  | "weekOfYear"
+  | "customRange";

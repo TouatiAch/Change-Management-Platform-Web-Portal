@@ -1,15 +1,6 @@
 import React from "react";
 import ReactECharts from "echarts-for-react";
-
-interface DowntimeRecord {
-  year: string;
-  Monthid: string; // numeric month (1-12)
-  downtime?: number | string;
-  rateofdowntime?: number | string;
-  Targetdowntime?: number | string;
-  seuildinterventiondowntime?: number | string;
-  Project?: string; // <-- Add this if not already present in your data!
-}
+import type { DowntimeRecord } from "./types";
 
 interface Props {
   data: DowntimeRecord[];
@@ -19,86 +10,142 @@ interface Props {
 
 export const UnplannedDowntimeChart: React.FC<Props> = ({
   data,
-  isQuarterly,
+  isQuarterly = false,
   selectedProject,
 }) => {
+  // ─── Helpers ────────────────────────────────────────────────────────────────
   const monthsOrder = [
     "January", "February", "March", "April", "May", "June",
-    "July", "August", "September", "October", "November", "December"
+    "July", "August", "September", "October", "November", "December",
   ];
-
-  const getMonthName = (monthId: string) => {
-    const index = parseInt(monthId, 10) - 1;
-    return monthsOrder[index] || "Unknown";
+  const getMonthName = (m: string) => {
+    const idx = parseInt(m, 10) - 1;
+    return monthsOrder[idx] || "Unknown";
   };
 
-  // --- FILTER BY PROJECT ---
-  const filteredData =
-    selectedProject.toLowerCase() === "draxlmaeir"
-      ? data
-      : data.filter(
-          (rec) =>
-            rec.Project?.toLowerCase() === selectedProject.toLowerCase()
-        );
-
-  const sortedData = [...filteredData].sort((a, b) => {
-    const yearDiff = parseInt(a.year) - parseInt(b.year);
-    if (yearDiff !== 0) return yearDiff;
-    return parseInt(a.Monthid) - parseInt(b.Monthid);
+  // ─── 1) Sort all data by year→month ──────────────────────────────────────────
+  const allSorted = [...data].sort((a, b) => {
+    const yd = parseInt(a.year, 10) - parseInt(b.year, 10);
+    return yd !== 0
+      ? yd
+      : parseInt(a.Monthid, 10) - parseInt(b.Monthid, 10);
   });
 
-  const xAxisLabels = sortedData.map((rec) => {
-    const monthName = getMonthName(rec.Monthid);
-    return `${monthName} ${rec.year}`;
-  });
+  // ─── 2) Build shared x-axis labels ─────────────────────────────────────────
+  const monthLabels = Array.from(
+    new Set(
+      allSorted.map(r => `${getMonthName(r.Monthid)} ${r.year}`)
+    )
+  );
 
-  const downtimeSeries = {
-    name: "Downtime (min)",
-    type: "bar",
-    data: sortedData.map(rec => parseFloat(String(rec.downtime || 0))),
+  // ─── 3) Detect “aggregate” vs “single project” ─────────────────────────────
+  const isAggregate = selectedProject.toLowerCase() === "draxlmaeir";
+
+  // ─── 4) List of projects to plot bars for ──────────────────────────────────
+  const projectsToPlot = isAggregate
+    ? Array.from(
+        new Set(allSorted.map(r => r.Project).filter(p => !!p))
+      ) as string[]
+    : [selectedProject];
+
+  // ─── 5) Build one bar-series per project, WITHOUT itemStyle.color ───────────
+  const downtimeSeries = projectsToPlot.map(proj => ({
+    name: isAggregate ? proj : "Downtime (min)",
+    type: "bar" as const,
+    data: monthLabels.map(label => {
+      const [mName, yr] = label.split(" ");
+      // sum downtime for this project + month
+      return allSorted
+        .filter(r =>
+          (isAggregate
+            ? r.Project === proj
+            : r.Project?.toLowerCase() === proj.toLowerCase()
+          ) &&
+          getMonthName(r.Monthid) === mName &&
+          r.year === yr
+        )
+        .reduce((sum, r) => sum + (Number(r.downtime) || 0), 0);
+    }),
     yAxisIndex: 0,
-    itemStyle: { color: "#fdae61" },
-  };
+  }));
 
+  // ─── 6) Rate, Target & Seuil lines (fixed colors) ───────────────────────────
   const rateSeries = {
     name: "Rate of Downtime",
-    type: "line",
+    type: "line" as const,
     smooth: true,
-    data: sortedData.map(rec =>
-      rec.rateofdowntime !== undefined ? parseFloat(String(rec.rateofdowntime)) * 100 : null
-    ),
+    data: monthLabels.map(label => {
+      const [mName, yr] = label.split(" ");
+      const rec = allSorted.find(
+        r =>
+          getMonthName(r.Monthid) === mName &&
+          r.year === yr &&
+          (isAggregate
+            ? true
+            : r.Project?.toLowerCase() === selectedProject.toLowerCase())
+      );
+      return rec && rec.rateofdowntime != null
+        ? Number(rec.rateofdowntime) * 100
+        : null;
+    }),
     yAxisIndex: 1,
-    lineStyle: { width: 2 },
+    lineStyle: { width: 2, color: "#2b83ba" },
     itemStyle: { color: "#2b83ba" },
   };
 
   const targetSeries = {
     name: "Target in %",
-    type: "line",
+    type: "line" as const,
     smooth: true,
-    data: sortedData.map(rec =>
-      rec.Targetdowntime !== undefined ? parseFloat(String(rec.Targetdowntime)) * 100 : null
-    ),
+    data: monthLabels.map(label => {
+      const [mName, yr] = label.split(" ");
+      const rec = allSorted.find(
+        r =>
+          getMonthName(r.Monthid) === mName &&
+          r.year === yr &&
+          (isAggregate
+            ? true
+            : r.Project?.toLowerCase() === selectedProject.toLowerCase())
+      );
+      return rec && rec.Targetdowntime != null
+        ? Number(rec.Targetdowntime)
+        : null;
+    }),
     yAxisIndex: 1,
-    lineStyle: { type: "dashed" },
+    lineStyle: { type: "dashed", color: "#5e72e4" },
     itemStyle: { color: "#5e72e4" },
   };
 
   const seuilSeries = {
     name: "Seuil d'intervention",
-    type: "line",
+    type: "line" as const,
     smooth: true,
-    data: sortedData.map(rec =>
-      rec.seuildinterventiondowntime !== undefined
-        ? parseFloat(String(rec.seuildinterventiondowntime)) * 100
-        : null
-    ),
+    data: monthLabels.map(label => {
+      const [mName, yr] = label.split(" ");
+      const rec = allSorted.find(
+        r =>
+          getMonthName(r.Monthid) === mName &&
+          r.year === yr &&
+          (isAggregate
+            ? true
+            : r.Project?.toLowerCase() === selectedProject.toLowerCase())
+      );
+      return rec && rec.seuildinterventiondowntime != null
+        ? Number(rec.seuildinterventiondowntime)
+        : null;
+    }),
     yAxisIndex: 1,
-    lineStyle: { type: "dotted" },
+    lineStyle: { type: "dotted", color: "#d7191c" },
     itemStyle: { color: "#d7191c" },
   };
 
+  // ─── 7) Compose the ECharts option ───────────────────────────────────────────
   const option = {
+    // (a) Let ECharts automatically assign a different color to each series:
+    //     remove all itemStyle.color on bars, and ECharts uses its default palette.
+    //     If you want a custom palette, you can uncomment & define this:
+    // color: ["#5470C6","#91CC75","#FAC858","#EE6666","#73C0DE","#3BA272"],
+
     title: {
       text: isQuarterly
         ? "Unplanned Downtime by Quarter"
@@ -107,13 +154,13 @@ export const UnplannedDowntimeChart: React.FC<Props> = ({
     },
     tooltip: {
       trigger: "axis",
-      formatter: (params: any) => {
+      formatter: (params: any[]) => {
         let txt = `<strong>${params[0]?.axisValue}</strong><br/>`;
-        params.forEach((p: any) => {
-          if (p.seriesName.includes("Downtime (min)")) {
+        params.forEach(p => {
+          if (p.seriesType === "bar") {
             txt += `${p.marker}${p.seriesName}: ${p.value?.toLocaleString()}<br/>`;
           } else {
-            txt += `${p.marker}${p.seriesName}: ${p.value?.toFixed(2)}%<br/>`;
+            txt += `${p.marker}${p.seriesName}: ${p.value?.toFixed(3)}%<br/>`;
           }
         });
         return txt;
@@ -122,47 +169,43 @@ export const UnplannedDowntimeChart: React.FC<Props> = ({
     legend: {
       top: 40,
       data: [
-        "Downtime (min)",
-        "Rate of Downtime",
-        "Target in %",
-        "Seuil d'intervention",
+        ...downtimeSeries.map(s => s.name),
+        rateSeries.name,
+        targetSeries.name,
+        seuilSeries.name,
       ],
     },
-    grid: {
-      top: 80,
-      left: 60,
-      right: 60,
-      bottom: 60,
-    },
+    grid: { top: 80, left: 60, right: 60, bottom: 60 },
     xAxis: {
       type: "category",
-      data: xAxisLabels,
-      axisLabel: {
-        rotate: isQuarterly ? 0 : 30,
-      },
+      data: monthLabels,
+      axisLabel: { rotate: isQuarterly ? 0 : 30 },
     },
     yAxis: [
-      {
-        type: "value",
-        name: "Minutes",
-        position: "left",
-      },
+      { type: "value", name: "Minutes", position: "left" },
       {
         type: "value",
         name: "Percentage",
         position: "right",
         axisLabel: {
-          formatter: "{value} %",
+          formatter: (v: number) => v.toFixed(3) + "%",
         },
       },
     ],
-    series: [downtimeSeries, rateSeries, targetSeries, seuilSeries],
+    series: [
+      ...downtimeSeries,
+      rateSeries,
+      targetSeries,
+      seuilSeries
+    ],
   };
 
   return (
     <ReactECharts
-      option={option}
+      option={option as any}
       style={{ width: "100%", height: 400 }}
     />
   );
 };
+
+export default UnplannedDowntimeChart;

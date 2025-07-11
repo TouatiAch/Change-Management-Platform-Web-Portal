@@ -9,12 +9,12 @@ import scrapIcon from "../assets/images/scrap.png";
 import targetIcon from "../assets/images/target.png";
 
 const tabs = [
-  { path: "/kpis/followup", label: "Follow-up Cost",        icon: followupIcon },
+  { path: "/kpis/followup", label: " Cost PA ",        icon: followupIcon },
   { path: "/kpis/scrap",      label: "Scrap",                 icon: scrapIcon    },
   { path: "/kpis/drx",        label: "Engineering DRX Ideas", icon: drxIcon      },
   { path: "/kpis/downtime",   label: "Downtime",              icon: downtimeIcon },
   { path: "/kpis/budget",     label: "Budget",                icon: budgetIcon   },
-  { path: "/kpis/phase4",     label: "Target",       icon: targetIcon   },
+  { path: "/kpis/phase4",     label: "Phase 4 Closure",       icon: targetIcon   },
 ];
 
 const SidebarMenu: React.FC = () => {

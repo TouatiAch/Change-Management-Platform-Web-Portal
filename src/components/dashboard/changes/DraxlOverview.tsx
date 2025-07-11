@@ -1,5 +1,8 @@
-// src/components/dashboardParts/DraxlOverview.tsx
+// src/components/dashboard/changes/DraxlOverview.tsx
+
 import React, { useState, useMemo, useEffect } from 'react';
+import ReactECharts from 'echarts-for-react';
+
 import DraxlameirSmallMultiples from '../changes/DraxlameirSmallMultiples';
 import AreaProjectNestedDonut    from '../changes/AreaProjectNestedDonut';
 import AutarkeSubareasPieChart   from '../changes/AutarkeSubareasPieChart';
@@ -17,7 +20,7 @@ interface Props {
 }
 
 const DraxlOverview: React.FC<Props> = ({ items }) => {
-  // ── 1) normalize all dates to zero-padded strings ──
+  // 1) Normalize year/month/day strings
   const normItems = useMemo(() => {
     return items.map(i => ({
       ...i,
@@ -27,54 +30,69 @@ const DraxlOverview: React.FC<Props> = ({ items }) => {
     }));
   }, [items]);
 
-  // ── 2) local filter state ──
-  const [areaMode, setAreaMode]   = useState<AreaMode>('year');
-  const [viewBy,   setViewBy]     = useState<ViewBy>('week');
-  const [yearView, setYearView]   = useState<YearView>('all');
+  // 2) Local filter state
+  const [areaMode,  setAreaMode]  = useState<AreaMode>('year');
+  const [viewBy,    setViewBy]    = useState<ViewBy>('week');
+  const [yearView,  setYearView]  = useState<YearView>('all');
   const now = new Date();
   const [areaYear,  setAreaYear]  = useState(String(now.getFullYear()));
-  const [areaMonth, setAreaMonth] = useState(
-    String(now.getMonth() + 1).padStart(2, '0')
-  );
+  const [areaMonth, setAreaMonth] = useState(String(now.getMonth()+1).padStart(2,'0'));
 
-  // ── 3) bring in our “working copy” and local “filtered” list ──
+  // 3) Filtered items for this overview
   const [allLocalItems,      setAllLocalItems]      = useState<ChangeItem[]>([]);
   const [filteredLocalItems, setFilteredLocalItems] = useState<ChangeItem[]>([]);
 
-  // whenever the parent gives us new props, reset our local copy
   useEffect(() => {
     setAllLocalItems(normItems);
   }, [normItems]);
 
-  // actually filter whenever any of the local controls change
   useEffect(() => {
     let result = allLocalItems;
 
-    // if single‐year drill-in, or month mode, restrict by year first
+    // if single‐year drill-in or month mode, restrict by year
     if (yearView === 'single' || areaMode === 'month') {
       result = result.filter(i => i.processyear === areaYear);
     }
-
-    // if month mode, further restrict by month
+    // and if month mode, further restrict by month
     if (areaMode === 'month') {
       result = result.filter(i => i.processmonth === areaMonth);
     }
 
     setFilteredLocalItems(result);
-  }, [allLocalItems, areaMode, viewBy, yearView, areaYear, areaMonth]);
+  }, [allLocalItems, areaMode, yearView, areaYear, areaMonth]);
 
-  // ── 4) recompute the list of areas from the **filtered** items ──
+  // 4) distinct areas for your area charts
   const areas = useMemo(
     () => Array.from(new Set(filteredLocalItems.map(i => i.SheetName || 'Unknown'))),
     [filteredLocalItems]
   );
 
+  // ── NEW: build a pie of “changes per sub-project” using Constructedspace ──
+  const projectList = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          filteredLocalItems.map(i => i.OEM || 'UnknownProject')
+        )
+      ).sort(),
+    [filteredLocalItems]
+  );
+  const projectData = useMemo(
+    () =>
+      projectList.map(proj => ({
+        name:  proj,
+        value: filteredLocalItems.filter(
+                  i => (i.OEM || 'UnknownProject') === proj
+                ).length
+      })),
+    [projectList, filteredLocalItems]
+  );
+
   return (
     <div className="space-y-6">
-      {/* ── LOCAL FILTER BAR ── */}
+      {/* ── FILTER BAR ── */}
       <div className="sticky top-16 bg-white z-20 p-4 flex flex-wrap items-center gap-4 border-b">
         <label className="font-medium">Area Charts:</label>
-        {/* year vs month */}
         <select
           value={areaMode}
           onChange={e => setAreaMode(e.target.value as AreaMode)}
@@ -84,20 +102,16 @@ const DraxlOverview: React.FC<Props> = ({ items }) => {
           <option value="month">Month</option>
         </select>
 
-        {/* always‐visible year picker */}
         <select
           value={areaYear}
           onChange={e => setAreaYear(e.target.value)}
           className="border px-2 py-1 rounded"
         >
-          {Array.from({ length: 5 }, (_, i) =>
-            String(now.getFullYear() - i)
-          ).map(y => (
+          {Array.from({ length: 5 }, (_, i) => String(now.getFullYear() - i)).map(y => (
             <option key={y} value={y}>{y}</option>
           ))}
         </select>
 
-        {/* month‐mode extra controls */}
         {areaMode === 'month' ? (
           <>
             <select
@@ -124,7 +138,6 @@ const DraxlOverview: React.FC<Props> = ({ items }) => {
             </select>
           </>
         ) : (
-          /* year‐mode: all vs single year */
           <select
             value={yearView}
             onChange={e => setYearView(e.target.value as YearView)}
@@ -136,21 +149,60 @@ const DraxlOverview: React.FC<Props> = ({ items }) => {
         )}
       </div>
 
-      {/* ── VISUALS ── */}
-      <div className="space-y-6">
-        <h2 className="text-xl font-semibold">Draxlameir Overview</h2>
+      {/* ── OVERVIEW TITLE ── */}
+      <h2 className="text-xl font-semibold">Draxlameir Overview</h2>
 
-        {/* small multiples uses filteredLocalItems */}
-        <DraxlameirSmallMultiples items={filteredLocalItems} />
+      {/* ── CHANGES PER SUB-PROJECT PIE ── */}
+      <div className="bg-white rounded-lg shadow-md p-6">
+        <h3 className="text-lg font-semibold mb-4">Changes by Sub-Project</h3>
+        <ReactECharts
+          option={{
+            tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
+            legend:  { orient: 'vertical', left: 'left', data: projectList },
+            series: [
+              {
+                name: 'Changes',
+                type: 'pie',
+                radius: '50%',
+                data: projectData,
+                emphasis: {
+                  itemStyle: {
+                    shadowBlur: 10,
+                    shadowOffsetX: 0,
+                    shadowColor: 'rgba(0,0,0,0.5)'
+                  }
+                }
+              }
+            ]
+          }}
+          style={{ height: 300, width: '100%' }}
+        />
+      </div>
 
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <h3 className="text-lg font-semibold mb-4">
-            Changes by Area &amp; Project
-          </h3>
-          <AreaProjectNestedDonut items={filteredLocalItems} />
-        </div>
+      {/* ── SMALL MULTIPLES ── */}
+      <DraxlameirSmallMultiples items={filteredLocalItems} />
 
-        <TotalAreaHybridChart
+      {/* ── NESTED DONUT ── */}
+      <div className="bg-white rounded-lg shadow-md p-6">
+        <h3 className="text-lg font-semibold mb-4">
+          Changes by Area &amp; Project
+        </h3>
+        <AreaProjectNestedDonut items={filteredLocalItems} />
+      </div>
+
+      {/* ── HYBRID CHARTS ── */}
+      <TotalAreaHybridChart
+        items={filteredLocalItems}
+        filterMode={areaMode}
+        viewBy={viewBy}
+        selectedYear={areaYear}
+        selectedMonth={areaMonth}
+        yearViewMode={yearView}
+      />
+      {areas.map(a => (
+        <AreaHybridChart
+          key={a}
+          area={a}
           items={filteredLocalItems}
           filterMode={areaMode}
           viewBy={viewBy}
@@ -158,25 +210,13 @@ const DraxlOverview: React.FC<Props> = ({ items }) => {
           selectedMonth={areaMonth}
           yearViewMode={yearView}
         />
+      ))}
 
-        {areas.map(a => (
-          <AreaHybridChart
-            key={a}
-            area={a}
-            items={filteredLocalItems}
-            filterMode={areaMode}
-            viewBy={viewBy}
-            selectedYear={areaYear}
-            selectedMonth={areaMonth}
-            yearViewMode={yearView}
-          />
-        ))}
-
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <SubAreaPieChart items={filteredLocalItems} />
-        </div>
-        <AutarkeSubareasPieChart items={filteredLocalItems} />
+      {/* ── SUB-AREA PIE CHARTS ── */}
+      <div className="bg-white rounded-lg shadow-md p-6">
+        <SubAreaPieChart items={filteredLocalItems} />
       </div>
+      <AutarkeSubareasPieChart items={filteredLocalItems} />
     </div>
   );
 };

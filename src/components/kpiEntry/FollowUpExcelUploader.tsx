@@ -13,7 +13,6 @@ interface IProject {
 
 export interface EditableRow {
   BucketID: string;            // Numéro du panier
-  Area: string;                // Zone
   Carline: string;             // Carline
   Topic: string;               // your new column
   Project: string;             // SP Project
@@ -37,6 +36,7 @@ interface UploadProps {
 }
 
 const ROWS_PER_PAGE = 5;
+
 // Pulls “Carline: A,B,C” out of a Parameters string
 function extractCarlines(parameters: string): string[] {
   const m = parameters.match(/Carline:\s*([^|]+)/i);
@@ -46,6 +46,7 @@ function extractCarlines(parameters: string): string[] {
     .map((c) => c.trim())
     .filter(Boolean);
 }
+
 const FollowUpExcelUploader: React.FC<UploadProps> = ({
   siteId,
   listId,
@@ -59,7 +60,6 @@ const FollowUpExcelUploader: React.FC<UploadProps> = ({
 
   // Bulk‐assign state
   const [bulkProjectId, setBulkProjectId] = useState("");
-  const [bulkArea, setBulkArea] = useState("");
   const [bulkCarline, setBulkCarline] = useState("");
   const [bulkProjectCarlines, setBulkProjectCarlines] = useState<string[]>([]);
 
@@ -77,6 +77,8 @@ const FollowUpExcelUploader: React.FC<UploadProps> = ({
       setBulkProjectId(projects[0].id);
     }
   }, [projects, bulkProjectId]);
+
+  // Load available carlines for the selected project
   useEffect(() => {
     if (!bulkProjectId) {
       setBulkProjectCarlines([]);
@@ -108,70 +110,83 @@ const FollowUpExcelUploader: React.FC<UploadProps> = ({
       }
     })();
   }, [bulkProjectId, projects, siteId]);
+
   // Parse the uploaded Excel (“Data” sheet)
-  const handleFileUpload = async (
-    e: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setMsg(null);
-    setLoading(true);
-    try {
-      const data = await file.arrayBuffer();
-      const wb = XLSX.read(data);
-      const sheet = wb.Sheets["Data"];
-      if (!sheet) throw new Error("Missing ‘Data’ sheet");
-      const raw: any[] = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+ // … inside your component …
 
-      const parsed = raw.map((r) => {
-        // robust date parsing
-        let dateVal = "";
-        const c = r["Créé le"];
-        if (typeof c === "number") {
-          const d = XLSX.SSF.parse_date_code(c);
-          dateVal = new Date(Date.UTC(d.y, d.m - 1, d.d))
-            .toISOString()
-            .slice(0, 10);
-        } else if (c instanceof Date) {
-          dateVal = c.toISOString().slice(0, 10);
-        } else if (typeof c === "string") {
-          const [p1, p2, p3] = c.split(/[-]/);
-          if (p3 && p2 && p1.length !== 4) {
-            dateVal = `${p3}-${p2.padStart(2, "0")}-${p1.padStart(
-              2,
-              "0"
-            )}`;
-          } else {
-            dateVal = c;
-          }
+const handleFileUpload = async (
+  e: React.ChangeEvent<HTMLInputElement>
+) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+  setMsg(null);
+  setLoading(true);
+
+  try {
+    const data = await file.arrayBuffer();
+    const wb = XLSX.read(data);
+    const sheet = wb.Sheets["Data"];
+    if (!sheet) throw new Error("Missing ‘Data’ sheet");
+
+    // 1) Skip blank rows at the XLSX level…
+    const raw: any[] = XLSX.utils.sheet_to_json(sheet, {
+      defval: "",
+      blankrows: false,
+    });
+
+    // 2) …then filter out any rows with no panier number
+    const filtered = raw.filter(
+      (r) => String(r["Numéro du panier"]).trim() !== ""
+    );
+
+    // 3) Map only your real rows
+    const parsed: EditableRow[] = filtered.map((r) => {
+      // your existing date‐parsing logic…
+      let dateVal = "";
+      const c = r["Créé le"];
+      if (typeof c === "number") {
+        const d = XLSX.SSF.parse_date_code(c);
+        dateVal = new Date(Date.UTC(d.y, d.m - 1, d.d))
+          .toISOString()
+          .slice(0, 10);
+      } else if (c instanceof Date) {
+        dateVal = c.toISOString().slice(0, 10);
+      } else if (typeof c === "string") {
+        const [p1, p2, p3] = c.split(/[-]/);
+        if (p3 && p2 && p1.length !== 4) {
+          dateVal = `${p3}-${p2.padStart(2, "0")}-${p1.padStart(2, "0")}`;
+        } else {
+          dateVal = c;
         }
-        return {
-          BucketID:          r["Numéro du panier"]         || "",
-          Area:              r["Zone"]                     || "",
-          Carline:           "",
-          Topic:             r["Topic"]                    || "",
-          Project:           "",
-          InitiationReasons: "",
-          Date:              dateVal,
-          Statut:            r["Statut"]                   || "",
-          Quantity:          Number(r["Quantité"]          || 0),
-          NettValue:         Number(r["Valeur nette"]       || 0),
-          TotalNettValue:    Number(r["Valeur nette totale"]|| 0),
-          Currency:          r["Devise"]                   || "",
-          BucketResponsible: r["Nom du panier"]            || "",
-          PostnameID:        r["Nom du poste"]             || "",
-          selected:          false,
-        } as EditableRow;
-      });
+      }
 
-      setRows(parsed);
-      setPage(1);
-    } catch (err: any) {
-      setMsg("Erreur: " + err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
+      return {
+        BucketID:          r["Numéro du panier"]         || "",
+        Area:              r["Zone"]                     || "",
+        Carline:           "",
+        Topic:             r["Topic"]                    || "",
+        Project:           "",
+        InitiationReasons: "",
+        Date:              dateVal,
+        Statut:            r["Statut"]                   || "",
+        Quantity:          Number(r["Quantité"]          || 0),
+        NettValue:         Number(r["Valeur nette"]       || 0),
+        TotalNettValue:    Number(r["Valeur nette totale"]|| 0),
+        Currency:          r["Devise"]                   || "",
+        BucketResponsible: r["Nom du panier"]            || "",
+        PostnameID:        r["Nom du poste"]             || "",
+        selected:          false,
+      };
+    });
+
+    setRows(parsed);
+    setPage(1);
+  } catch (err: any) {
+    setMsg("Erreur: " + err.message);
+  } finally {
+    setLoading(false);
+  }
+};
 
   // Edit a single cell
   const changeRow = <K extends keyof EditableRow>(
@@ -196,18 +211,18 @@ const FollowUpExcelUploader: React.FC<UploadProps> = ({
       rs.map((r, idx) => (idx === i ? { ...r, selected: chk } : r))
     );
 
-  // Bulk‐apply Project/Zone/Carline
+  // Bulk‐apply Project & Carline only
   const applyBulk = () => {
     setRows((rs) =>
       rs.map((r) =>
         r.selected
-          ? { ...r, Project: bulkProjectId, Area: bulkArea, Carline: bulkCarline }
+          ? { ...r, Project: bulkProjectId, Carline: bulkCarline }
           : r
       )
     );
   };
 
-  // Upload to SP
+  // Upload to SP (no changes here)
   const uploadAll = async () => {
     setLoading(true);
     setMsg(null);
@@ -217,30 +232,28 @@ const FollowUpExcelUploader: React.FC<UploadProps> = ({
       ]);
       const valid = rows.filter(
         (r) =>
-          r.selected && r.Project && r.Area && r.Carline && r.InitiationReasons
+          r.selected && r.Project && r.Carline && r.InitiationReasons
       );
       if (!valid.length) {
         setMsg(
-          "Veuillez sélectionner et remplir Project, Zone, Carline et Raison."
+          "Veuillez sélectionner et remplir Project, Carline et Raison."
         );
         setLoading(false);
         return;
       }
       for (let r of valid) {
-  // strip out 'selected'
-  const { selected, ...fields } = r;
-  await axios.post(
-    `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listId}/items`,
-    { fields },
-    {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-    }
-  );
-}
-
+        const { selected, ...fields } = r;
+        await axios.post(
+          `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listId}/items`,
+          { fields },
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+          }
+        );
+      }
       setMsg("Importation terminée !");
       setRows([]);
       onComplete?.();
@@ -252,6 +265,7 @@ const FollowUpExcelUploader: React.FC<UploadProps> = ({
       setLoading(false);
     }
   };
+
   return (
     <div className="space-y-6">
       {/* 1) File picker */}
@@ -264,13 +278,12 @@ const FollowUpExcelUploader: React.FC<UploadProps> = ({
 
       {rows.length > 0 && (
         <>
-          {/* 2) Bulk-assign panel (carousel outside table) */}
+          {/* 2) Bulk-assign panel */}
           <div className="p-4 bg-white/10 border rounded space-y-4">
             <p className="font-semibold text-blue-100">
               Sélectionnez des lignes puis :
             </p>
 
-            {/* ← your ProjectCarousel */}
             <ProjectCarousel
               projects={projects}
               selectedProject={bulkProjectId}
@@ -278,19 +291,6 @@ const FollowUpExcelUploader: React.FC<UploadProps> = ({
             />
 
             <div className="flex flex-wrap items-center gap-4">
-              {/* Zone */}
-              <select
-                value={bulkArea}
-                onChange={(e) => setBulkArea(e.target.value)}
-                className="p-2 rounded text-black"
-              >
-                <option value="">-- Zone --</option>
-                <option>MR</option>
-                <option>Innenraum</option>
-                <option>Autarke</option>
-                <option>Cockpit</option>
-              </select>
-
               {/* Carline (dynamic) */}
               <select
                 value={bulkCarline}
@@ -310,7 +310,6 @@ const FollowUpExcelUploader: React.FC<UploadProps> = ({
                 disabled={
                   !someSel ||
                   !bulkProjectId ||
-                  !bulkArea ||
                   !bulkCarline
                 }
                 className="px-4 py-2 bg-blue-600 text-white rounded disabled:opacity-50"
@@ -319,6 +318,7 @@ const FollowUpExcelUploader: React.FC<UploadProps> = ({
               </button>
             </div>
           </div>
+
           {/* 3) Preview table */}
           <div className="overflow-x-auto bg-white/10 border rounded p-4">
             <table className="min-w-max w-full text-white text-sm">
@@ -332,7 +332,6 @@ const FollowUpExcelUploader: React.FC<UploadProps> = ({
                     />
                   </th>
                   <th>Panier ID</th>
-                  <th>Zone</th>
                   <th>Carline</th>
                   <th>Topic</th>
                   <th>Projet</th>
@@ -354,37 +353,52 @@ const FollowUpExcelUploader: React.FC<UploadProps> = ({
                       <td>
                         <input
                           value={r.BucketID}
-                          onChange={(e) => changeRow(idx, "BucketID", e.target.value)}
+                          onChange={(e) =>
+                            changeRow(idx, "BucketID", e.target.value)
+                          }
                           className="w-28 p-1 text-black"
                         />
                       </td>
-                      <td>{r.Area}</td>
                       <td>{r.Carline}</td>
                       <td>
                         <input
                           value={r.Topic}
-                          onChange={(e) => changeRow(idx, "Topic", e.target.value)}
+                          onChange={(e) =>
+                            changeRow(idx, "Topic", e.target.value)
+                          }
                           className="w-32 p-1 text-black"
                         />
                       </td>
                       <td>
-                        {projects.find((p) => p.id === r.Project)?.displayName}
+                        {
+                          projects.find((p) => p.id === r.Project)
+                            ?.displayName
+                        }
                       </td>
                       <td>
                         <select
                           value={r.InitiationReasons}
-                          onChange={(e) => changeRow(idx, "InitiationReasons", e.target.value)}
+                          onChange={(e) =>
+                            changeRow(
+                              idx,
+                              "InitiationReasons",
+                              e.target.value
+                            )
+                          }
                           className="p-1 text-black"
                         >
                           <option value="">– Raison –</option>
+                          <option value="demande à la suite d'un mail/réunion d'analyse de réclamation">
+                            demande à la suite d'un mail/réunion d'analyse de réclamation
+                          </option>
                           <option value="demande suite à un changement technique (aeb)">
                             demande suite à un changement technique (aeb)
                           </option>
                           <option value="demande suite une optimisation">
                             demande suite une optimisation
                           </option>
-                          <option value="demande suite mail/revendication">
-                            demande suite mail/revendication
+                          <option value="suite demande PT">
+                            suite demande PT
                           </option>
                         </select>
                       </td>

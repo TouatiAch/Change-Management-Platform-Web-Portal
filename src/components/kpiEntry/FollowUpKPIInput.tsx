@@ -1,9 +1,5 @@
 import React, { useState, useEffect } from "react";
-import ProjectCarousel from "../ProjectCarousel";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
-import { getAccessToken } from "../../auth/getToken";
-import { msalInstance } from "../../auth/msalInstance";
 import FollowUpExcelUploader from "./FollowUpExcelUploader";
 
 interface FollowUpForm {
@@ -38,7 +34,7 @@ const FollowUpCostInput: React.FC = () => {
   const navigate = useNavigate();
 
   const [projects, setProjects] = useState<IProject[]>([]);
-  const [form, setForm] = useState<FollowUpForm>({
+  const [, setForm] = useState<FollowUpForm>({
     project: "",
     area: "Innenraum",
     followUpCost: 0,
@@ -48,7 +44,6 @@ const FollowUpCostInput: React.FC = () => {
     bucketResponsible: "",
     postName: "",
   });
-  const [msg, setMsg] = useState<string | null>(null);
   const [tab, setTab] = useState<"manual" | "excel">("manual");
 
   useEffect(() => {
@@ -67,53 +62,6 @@ const FollowUpCostInput: React.FC = () => {
       }
     }
   }, []);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setMsg(null);
-
-    try {
-      const token = await getAccessToken(msalInstance, ["https://graph.microsoft.com/Sites.Manage.All"]);
-      if (!token) throw new Error("Could not get access token.");
-
-      await axios.post(
-        `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listId}/items`,
-        {
-          fields: {
-            Project: form.project,
-            Area: form.area,
-            Followupcost_x002f_BudgetPA: form.followUpCost,
-            InitiationReasons: form.initiationReason,
-            BucketID: form.bucketId,
-            Date: form.entryDate,
-            BucketResponsible: form.bucketResponsible,
-            Postname_x002f_ID: form.postName,
-          },
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-        }
-      );
-
-      setMsg("Enregistrement réussi !");
-      setForm({
-        project: "",
-        area: "Innenraum",
-        followUpCost: 0,
-        initiationReason: "demande suite à un changement technique (aeb)",
-        bucketId: "",
-        entryDate: new Date().toISOString().slice(0, 10),
-        bucketResponsible: "",
-        postName: "",
-      });
-    } catch (err: any) {
-      console.error("Error creating follow cost item:", err);
-      setMsg("Erreur: " + (err.response?.data?.error?.message || err.message));
-    }
-  };
 
   return (
     <div className="relative w-full min-h-screen bg-cover bg-center text-white">

@@ -21,15 +21,18 @@ import StatsCards from "./changes/StatsCards";
 import { OpenClosedPieChart } from "./phase 4 closure/OpenClosedPieChart";
 import { ScrapPieChart } from "./scrap/ScrapPieChart";
 import { UnplannedDowntimeChart } from "./downtime/UnplannedDowntimeChart";
-import { FollowupCostByAreaChart } from "./followupcost/FollowupCostByAreaChart";
-import { FollowupCostCombinedChart } from "./followupcost/FollowupCostCombinedChart";
-import { FollowupCostByReasonChart } from "./followupcost/FollowupCostByReasonChart";
 import { DRXEntriesChart } from "./drx/DRXEntriesChart";
 import { DRXIdeaProgressChart } from "./drx/DRXIdeaProgressChart";
 import { BudgetDepartmentChart } from "./budget/BudgetDepartmentChart";
 import { BudgetEntriesChart } from "./budget/BudgetEntriesChart";
 import DraxlOverview from "./changes/DraxlOverview";
 import { ChangeStatusSemiPieChart } from "./phase 4 closure/ChangeStatusSemiPieChart";
+import { FollowupCostTimeSeriesChart } from "./followupcost/FollowupCostTimeSeriesChart";
+import { FollowupCostByProjectReasonChart } from "./followupcost/FollowupCostByProjectReasonChart";
+import { FollowupCostByReasonTimeSeriesChart } from "./followupcost/FollowupCostByReasonTimeSeriesChart";
+import { FollowupCostSubProjectChart } from "./followupcost/FollowupCostSubProjectChart";
+import { FollowupCostProjectTimeSeriesChart } from "./followupcost/FollowupCostProjectTimeSeriesChart";
+// … other imports …
 
 const apiTabs = [
   { key: "changes", label: "Changes", icon: changesIcon },
@@ -85,38 +88,37 @@ interface ChangeItem {
   Estimatedscrap?: number;
   OEM?: string;
 }
-interface MonthlyKPIItem {
-  ID: string;
-  year: string;
-  Monthid: string;
-  Project?: string;
-  downtime?: number;
-  rateofdowntime?: number;
-  Targetdowntime?: number;
-  seuildinterventiondowntime?: number;
-  DRXIdeasubmittedIdea?: number;
-  DRXIdeasubmittedIdeaGoal?: number;
-  Budgetdepartment?: number;
-  Budgetdepartmentplanified?: number;
+export interface MonthlyKPIItem {
+  ID: string;                         // your SharePoint item id
+  Project: string;                    // fields.Project
+  year: string;                       // fields.year
+  Month: string;                      // fields.Month
+  Monthid: string;                    // fields.Monthid
+  DRXIdeasubmittedIdea?: number;      // fields.DRXIdeasubmittedIdea
+  DRXIdeasubmittedIdeaGoal?: number;  // fields.DRXIdeasubmittedIdeaGoal
+  productionminutes?: number;         // fields.productionminutes
+  downtime?: number;                  // fields.downtime
+  rateofdowntime?: number;            // fields.rateofdowntime
+  Targetdowntime?: number;            // fields.Targetdowntime
+  seuildinterventiondowntime?: number;// fields.seuildinterventiondowntime
 }
 export interface FollowCostItem {
   ID: string;                  // SharePoint item id
-  Project: string;
-  Area: string;
-  Carline: string;
-  FollowupcostBudgetPA: number;
-  InitiationReasons: string;
-  BucketID: string;
-  Date: string;                // Format: YYYY-MM-DD
-  Statut: string;
-  Quantity: number;
-  NettValue: number;
-  TotalNettValue: number;
-  Currency: string;
-  BucketResponsible: string;
-  PostnameID: string;
+  Project: string;             // fields.Project
+  Area: string;                // fields.Area
+  Carline: string;             // fields.Carline
+  InitiationReasons: string;   // fields.InitiationReasons
+  BucketID: string;            // fields.BucketID
+  Date: string;                // fields.Date (YYYY-MM-DD)
+  Statut: string;              // fields.Statut
+  Quantity: number;            // fields.Quantity
+  NettValue: number;           // fields.NettValue
+  TotalNettValue: number;      // fields.TotalNettValue
+  Currency: string;            // fields.Currency
+  BucketResponsible: string;   // fields.BucketResponsible
+  PostnameID: string;          // fields.PostnameID
+  Topic: string;               // fields.Topic
 }
-
 
 type FilterMode =
   | "year"
@@ -279,19 +281,20 @@ const config = getConfig();
                 throw new Error("Missing array at resp.data.value from SharePoint.");
               }
               const pageItems = resp.data.value.map((it: any) => ({
-                ID: it.id,
-                year: it.fields.year,
-                Monthid: it.fields.Monthid,
-                Project: it.fields.Project,
-                downtime: it.fields.downtime,
-                rateofdowntime: it.fields.rateofdowntime,
-                Targetdowntime: it.fields.Targetdowntime,
-                seuildinterventiondowntime: it.fields.seuildinterventiondowntime,
-                DRXIdeasubmittedIdea: it.fields.DRXIdeasubmittedIdea,
-                DRXIdeasubmittedIdeaGoal: it.fields.DRXIdeasubmittedIdeaGoal,
-                Budgetdepartment: it.fields.Budgetdepartment,
-                Budgetdepartmentplanified: it.fields.Budgetdepartmentplanified,
-              }));
+  ID: it.id,
+  Project: it.fields.Project,
+  year: it.fields.year,
+  Month: it.fields.Month,
+  Monthid: it.fields.Monthid,
+  DRXIdeasubmittedIdea: Number(it.fields.DRXIdeasubmittedIdea)      || 0,
+  DRXIdeasubmittedIdeaGoal: Number(it.fields.DRXIdeasubmittedIdeaGoal) || 0,
+  productionminutes: Number(it.fields.productionminutes)             || 0,
+  downtime: Number(it.fields.downtime)                              || 0,
+  rateofdowntime: Number(it.fields.rateofdowntime)                  || 0,
+  Targetdowntime: Number(it.fields.Targetdowntime)                  || 0,
+  seuildinterventiondowntime: Number(it.fields.seuildinterventiondowntime) || 0,
+})) as MonthlyKPIItem[];
+
               kpiAccumulated.push(...pageItems);
               nextLink = resp.data["@odata.nextLink"] || "";
             }
@@ -309,12 +312,21 @@ const config = getConfig();
                   headers: { Authorization: `Bearer ${token}` },
                 });
                 const pageItems = resp.data.value.map((it: any) => ({
-                  ID: it.id,
-                  Project: it.fields.Project,
-                  Area: it.fields.Area,
-                  TotalNettValue: it.fields.TotalNettValue ?? it.fields.Followupcost_x002f_BudgetPA ?? 0, // use new schema if available, fallback if needed
-                  Date: it.fields.Date,
-                  InitiationReasons: it.fields.InitiationReasons,
+                 ID: it.id,
+  Project:              it.fields.Project,
+  Area:                 it.fields.Area,
+  Carline:              it.fields.Carline,
+  InitiationReasons:    it.fields.InitiationReasons,
+  BucketID:             it.fields.BucketID,
+  Date:                 it.fields.Date,
+  Statut:               it.fields.Statut,
+  Quantity:             Number(it.fields.Quantity)      || 0,
+  NettValue:            Number(it.fields.NettValue)     || 0,
+  TotalNettValue:       Number(it.fields.TotalNettValue)|| 0,
+  Currency:             it.fields.Currency,
+  BucketResponsible:    it.fields.BucketResponsible,
+  PostnameID:           it.fields.PostnameID,
+  Topic:                it.fields.Topic,
                 }));
                 followCostAccumulated.push(...pageItems);
                 nextLink = resp.data["@odata.nextLink"] || "";
@@ -694,49 +706,144 @@ const config = getConfig();
           {/* --- COST PA --- */}
           {selectedApi === "costPA" && (
             <>
-              <FollowupCostByAreaChart
-                data={followCostItems}
-                filterMode={filterMode}
-                selectedYear={selectedYear}
-                selectedMonth={selectedMonth}
-                selectedDay={selectedDay}
-                selectedQuarter={selectedQuarter}
-                selectedWeekOfMonth={selectedWeekOfMonth ?? undefined}
-                selectedWeekOfYear={selectedWeekOfYear ?? undefined}
-                selectedProject={project?.toLowerCase() || ""}
-              />
-              <div className="bg-white rounded-lg shadow-md p-6">
-                <h2 className="text-xl font-semibold mb-2">
-                  Coût suivi / Budget PA par Raison de l’initiation
-                </h2>
-                <FollowupCostByReasonChart
-                  data={followCostItems}
-                  filterMode={filterMode}
-                  selectedYear={selectedYear}
-                  selectedMonth={selectedMonth}
-                  selectedDay={selectedDay}
-                  selectedQuarter={selectedQuarter}
-                  selectedWeekOfMonth={selectedWeekOfMonth ?? undefined}
-                  selectedWeekOfYear={selectedWeekOfYear ?? undefined}
-                  selectedProject={project?.toLowerCase() || ""}
-                />
-              </div>
-              <div className="bg-white/10 backdrop-blur-lg rounded-xl shadow-md p-6">
-                <h2 className="text-xl font-semibold mb-2">
-                  Coût suivi / Budget PA par Raison et Zone
-                </h2>
-                <FollowupCostCombinedChart
-                  data={followCostItems}
-                  filterMode={filterMode}
-                  selectedYear={selectedYear}
-                  selectedMonth={selectedMonth}
-                  selectedDay={selectedDay}
-                  selectedQuarter={selectedQuarter}
-                  selectedWeekOfMonth={selectedWeekOfMonth ?? undefined}
-                  selectedWeekOfYear={selectedWeekOfYear ?? undefined}
-                  selectedProject={project?.toLowerCase() || ""}
-                />
-              </div>
+              {/* —————————————————————————————— */}
+{/* For *single* projects: time-series */}
+<div className="bg-white rounded-lg shadow-md p-6 col-span-2">
+  <h2 className="text-xl font-semibold mb-2">Total Nett Value over Time</h2>
+  <FollowupCostTimeSeriesChart
+    data={followCostItems}
+    filterMode={filterMode}
+    selectedProject={project!.toLowerCase()}
+    selectedYear={selectedYear}
+    selectedMonth={selectedMonth}
+    selectedDay={selectedDay}
+    selectedQuarter={selectedQuarter}
+    selectedWeekOfMonth={selectedWeekOfMonth ?? undefined}
+    selectedWeekOfYear={selectedWeekOfYear ?? undefined}
+    fromYear={fromYear}
+    fromMonth={fromMonth}
+    fromDay={fromDay}
+    toYear={toYear}
+    toMonth={toMonth}
+    toDay={toDay}
+  />
+</div>
+{/* reasons over time */}
+<div className="bg-white rounded-lg shadow-md p-6 col-span-2">
+ <FollowupCostByReasonTimeSeriesChart
+    data={followCostItems}
+    filterMode={filterMode}
+    selectedProject={project!.toLowerCase()}
+    selectedYear={selectedYear}
+    selectedMonth={selectedMonth}
+    selectedDay={selectedDay}
+    selectedQuarter={selectedQuarter}
+    selectedWeekOfMonth={selectedWeekOfMonth ?? undefined}
+    selectedWeekOfYear={selectedWeekOfYear ?? undefined}
+    fromYear={fromYear}
+    fromMonth={fromMonth}
+    fromDay={fromDay}
+    toYear={toYear}
+    toMonth={toMonth}
+    toDay={toDay}
+ />
+ </div>
+  {project?.toLowerCase() === "draxlmaeir" && (
+    <>
+    {/* 1) Total Nett Value (ALL projects) over Time */}
+    <div className="bg-white rounded-lg shadow-md p-6 col-span-2">
+      <h2 className="text-xl font-semibold mb-2">
+        Total Nett Value over Time (All Projects)
+      </h2>
+      <FollowupCostTimeSeriesChart
+        data={followCostItems}
+        filterMode={filterMode}
+        selectedProject="draxlmaeir"       // <-- this tells it to include everything
+        selectedYear={selectedYear}
+        selectedMonth={selectedMonth}
+        selectedDay={selectedDay}
+        selectedQuarter={selectedQuarter}
+        selectedWeekOfMonth={selectedWeekOfMonth ?? undefined}
+        selectedWeekOfYear={selectedWeekOfYear ?? undefined}
+        fromYear={fromYear}
+        fromMonth={fromMonth}
+        fromDay={fromDay}
+        toYear={toYear}
+        toMonth={toMonth}
+        toDay={toDay}
+      />
+    </div>
+      {/* 1) Time-series across dates */}
+      <div className="bg-white rounded-lg shadow-md p-6 col-span-2">
+        <h2 className="text-xl font-semibold mb-2">
+          Total Nett Value over Time
+        </h2>
+      <FollowupCostProjectTimeSeriesChart
+    data={followCostItems}
+    filterMode={filterMode}
+    selectedYear={selectedYear}
+    selectedMonth={selectedMonth}
+    selectedDay={selectedDay}
+    selectedQuarter={selectedQuarter}
+    selectedWeekOfMonth={selectedWeekOfMonth ?? undefined}
+    selectedWeekOfYear={selectedWeekOfYear ?? undefined}
+    fromYear={fromYear}
+    fromMonth={fromMonth}
+    fromDay={fromDay}
+    toYear={toYear}
+    toMonth={toMonth}
+    toDay={toDay}
+  />
+
+      </div>
+
+      {/* 2) Breakdown by each sub-project */}
+      <div className="bg-white rounded-lg shadow-md p-6 col-span-2">
+        <h2 className="text-xl font-semibold mb-2">
+          Total Nett Value per Sub-Project
+        </h2>
+        <FollowupCostSubProjectChart
+          data={followCostItems}
+          filterMode={filterMode}
+          selectedYear={selectedYear}
+          selectedMonth={selectedMonth}
+          selectedDay={selectedDay}
+          selectedQuarter={selectedQuarter}
+          selectedWeekOfMonth={selectedWeekOfMonth  ?? undefined}
+          selectedWeekOfYear={selectedWeekOfYear  ?? undefined}
+          fromYear={fromYear}
+          fromMonth={fromMonth}
+          fromDay={fromDay}
+          toYear={toYear}
+          toMonth={toMonth}
+          toDay={toDay}
+        />
+      </div>
+
+      {/* 3) And finally your "per project × reason" */}
+      <div className="bg-white rounded-lg shadow-md p-6 col-span-2">
+        <h2 className="text-xl font-semibold mb-2">
+          Total Nett Value per Project × Reason
+        </h2>
+        <FollowupCostByProjectReasonChart
+          data={followCostItems}
+          filterMode={filterMode}
+          selectedYear={selectedYear}
+          selectedMonth={selectedMonth}
+          selectedDay={selectedDay}
+          selectedQuarter={selectedQuarter}
+          selectedWeekOfMonth={selectedWeekOfMonth  ?? undefined}
+          selectedWeekOfYear={selectedWeekOfYear  ?? undefined}
+          fromYear={fromYear}
+          fromMonth={fromMonth}
+          fromDay={fromDay}
+          toYear={toYear}
+          toMonth={toMonth}
+          toDay={toDay}
+        />
+      </div>
+    </>
+  )}
             </>
           )}
 
