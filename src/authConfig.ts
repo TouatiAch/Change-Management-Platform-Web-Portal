@@ -3,11 +3,11 @@
 export const msalConfig = {
   auth: {
     //app registration for draxlameir
-    //clientId: "0681f782-b93e-4816-abc1-04db7c272689",
-   //authority: "https://login.microsoftonline.com/492ac175-0fcd-4d6c-8fde-e15c70d1986b", 
+    clientId: "0681f782-b93e-4816-abc1-04db7c272689",
+   authority: "https://login.microsoftonline.com/492ac175-0fcd-4d6c-8fde-e15c70d1986b", 
 //app registration for uit
-    clientId: "17d45425-fdd2-42ea-aa96-37a92dc49794",
-    authority: "https://login.microsoftonline.com/e030b0c2-7438-480c-8b0c-0d7c3ae5f098", 
+    //clientId: "17d45425-fdd2-42ea-aa96-37a92dc49794",
+    //authority: "https://login.microsoftonline.com/e030b0c2-7438-480c-8b0c-0d7c3ae5f098", 
     redirectUri: process.env.REACT_APP_REDIRECT_URI!,
   },
   cache: {
