@@ -53,7 +53,6 @@ const REQUIRED_LISTS: Array<{ name: string; fields: FieldDef[] }> = [
       { name: "Project",                       type: "Text"   },
       { name: "year",                          type: "Text"   },
       { name: "Month",                         type: "Text"   },
-      { name: "Monthid",                       type: "Text"   },
       { name: "productionminutes",             type: "Number" },
       { name: "downtime",                      type: "Number" },
       { name: "rateofdowntime",                type: "Number" },

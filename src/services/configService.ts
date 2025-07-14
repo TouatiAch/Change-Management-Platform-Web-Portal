@@ -18,6 +18,7 @@ export interface IProject {
 export interface FieldDef {
   name: string;
   type: "Text" | "Number";
+  label?: string;
 }
 
 /** Drives the generic CRUD or Excel-upload UI for a SharePoint list */

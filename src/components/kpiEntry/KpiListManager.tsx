@@ -218,7 +218,7 @@ export default function KpiListManager({
             return (
               <div key={f.name} className="flex flex-col">
                 <label className="text-sm font-medium text-white mb-1">
-                  {f.name}
+                  {f.label}
                 </label>
                 {["year","month","quarter"].includes(f.name.toLowerCase()) ? (
                   (() => {
@@ -333,7 +333,7 @@ export default function KpiListManager({
                     key={f.name}
                     className="border-b pb-2 text-left text-white"
                   >
-                    {f.name}
+                    {f.label}
                   </th>
                 ))}
                 <th className="border-b pb-2 text-white">Actions</th>
