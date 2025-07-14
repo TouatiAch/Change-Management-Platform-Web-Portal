@@ -152,7 +152,7 @@ const DRXEntriesChart: React.FC = () => {
     else if (filterMode === "hy") {
       // H1 = Q1+Q2, H2 = Q3+Q4
       [1, 2].forEach(h => {
-        labs.push(`H${h} ${selectedYear}`);
+        labs.push(`HY${h} ${selectedYear}`);
         const recs = recsForQuarter(selectedYear, h*2-1)
                    .concat(recsForQuarter(selectedYear, h*2));
         subs.push(recs.reduce((a, r) => a + (r.DRXIdeasubmittedIdea||0), 0));
@@ -221,7 +221,7 @@ const DRXEntriesChart: React.FC = () => {
   const filterOptions: { key: FilterMode; label: string }[] = [
     { key: "year",        label: "By Year (12 mo)" },
     { key: "allQuarters", label: "All Quarters"    },
-    { key: "hy",          label: "HY (H1 / H2)"    },
+    { key: "hy",          label: "HY (HY1 / Hy2)"    },
     { key: "quarter",     label: "One Quarter"     },
     { key: "month",       label: "By Month"        },
     { key: "customRange", label: "Custom Range"    },
@@ -371,8 +371,44 @@ const DRXEntriesChart: React.FC = () => {
           },
           yAxis: { type: "value" },
           series: [
-            { name: "Target",    type: "bar",  data: goals      },
-            { name: "Submitted", type: "bar",  data: submitted  },
+           {
+         name: "Target",
+        type: "bar",
+         data: goals,
+         barWidth: "25%",             // ← make bars narrower
+          label: {
+           show: true,
+           position: "top",
+           formatter: "{c}",
+           backgroundColor: "#fff",
+           borderColor: "#aaa",
+           borderWidth: 1,
+           borderRadius: 8,
+           padding: [4, 8],
+           color: "#333",
+           shadowBlur: 4,
+           shadowColor: "rgba(0,0,0,0.1)",
+         }
+       },
+       {
+         name: "Submitted",
+         type: "bar",
+         data: submitted,
+         barWidth: "25%",             // ← same width here
+        label: {
+           show: true,
+           position: "top",
+           formatter: "{c}",
+           backgroundColor: "#fff",
+           borderColor: "#aaa",
+           borderWidth: 1,
+           borderRadius: 8,
+           padding: [4, 8],
+           color: "#333",
+           shadowBlur: 4,
+           shadowColor: "rgba(0,0,0,0.1)",
+         }
+       }
           ],
         }}
         style={{ width: "100%", height: 450 }}
