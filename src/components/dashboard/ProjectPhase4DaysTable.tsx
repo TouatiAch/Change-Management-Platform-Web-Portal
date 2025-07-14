@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import axios from "axios";
 // For robust date parsing & formatting:
 import { parse, parseISO, isValid, format } from "date-fns";
+import Phase4PieCharts from "./phase 4 closure/Phase4PieCharts";
 
 const DEPARTMENTS = [
   { key: "PAV", label: "PaV", endField: "EnddatePAVPhase4" },
@@ -281,6 +282,12 @@ const ProjectPhase4DaysTable: React.FC<Props> = ({
               )}
             </tbody>
           </table>
+          <Phase4PieCharts
+      changeItems={filteredItems}
+      targets={targets}
+      projects={projects}
+      selectedProjectId={selectedProjectId /* or omit to include ALL projects */}
+    />
         </div>
       )}
     </div>

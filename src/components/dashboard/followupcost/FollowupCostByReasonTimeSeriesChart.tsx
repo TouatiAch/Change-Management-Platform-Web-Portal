@@ -4,14 +4,19 @@ import React from "react";
 import ReactECharts from "echarts-for-react";
 import { FilterMode, FollowCostItem } from "../../../pages/types";
 
-/** Parses "DD.MM.YYYY HH:mm:ss" or "DD.MM.YYYY" */
+/** Parse "DD.MM.YYYY HH:mm:ss" or "DD.MM.YYYY" */
 function parseEuropeanDate(dateStr: string): Date {
+  const d = new Date(dateStr);
+  if (!isNaN(d.getTime())) {
+    return d;
+  }
+
+  // 2) Fallback to European style "DD.MM.YYYY[ HH:mm:ss]"
   const [datePart, timePart = "00:00:00"] = dateStr.split(" ");
   const [day, month, year]               = datePart.split(".").map(Number);
   const [h, m, s]                        = timePart.split(":").map(Number);
   return new Date(year, month - 1, day, h, m, s);
 }
-
 interface Props {
   data: FollowCostItem[];
   filterMode: FilterMode;
@@ -164,7 +169,6 @@ const PALETTE = ["#5470C6", "#91CC75", "#FAC858", "#EE6666", "#73C0DE"];
 // … then replace your `option` definition with:
 
 const option = {
-  // 1) Use your palette
   color: PALETTE,
 
   title: {
@@ -173,7 +177,6 @@ const option = {
     textStyle: { fontSize: 16 },
   },
 
-  // 2) Add save‐as‐image toolbox
   toolbox: {
     show: true,
     feature: {
@@ -192,7 +195,6 @@ const option = {
         .join("<br/>")
   },
 
-  // 3) Legend along the bottom, horizontal
   legend: {
     orient: "horizontal",
     bottom: 10,
@@ -208,23 +210,21 @@ const option = {
     containLabel: true
   },
 
-  // 4) Horizontal, larger axis labels
   xAxis: {
     type: "category",
     data: dates,
     axisLabel: {
-      rotate: 0,
+      rotate: 30,        // tilt labels 30°
+      interval: "auto",  // show every Nth if still too crowded
       fontSize: 12,
-      interval: 0,
-      formatter: (val: string) => {
+      formatter: (val: string) => { 
+        // optional: wrap long labels onto two lines
         const max = 15;
         if (val.length <= max) return val;
         const idx = val.lastIndexOf(" ", max);
-        if (idx > 0) {
-          return val.slice(0, idx) + "\n" + val.slice(idx + 1);
-        }
+        if (idx > 0) return val.slice(0, idx) + "\n" + val.slice(idx + 1);
         return val.slice(0, max) + "\n" + val.slice(max);
-      },
+      }
     },
     axisTick: { alignWithLabel: true }
   },
@@ -236,7 +236,6 @@ const option = {
     axisLabel: { fontSize: 14 }
   },
 
-  // 5) Balloon labels above each bar
   series: series.map((s, idx) => ({
     ...s,
     barWidth: 20,
@@ -244,12 +243,16 @@ const option = {
       show: true,
       position: "top",
       formatter: (p: any) => `€${(p.value as number).toLocaleString()}`,
-      backgroundColor: "auto",  // matches the bar color
+      backgroundColor: "auto",
       padding: [4, 8],
       borderRadius: 4,
       color: "#fff",
       fontSize: 12,
       offset: [0, -6]
+    },
+    // ← auto-hide overlapping balloons
+    labelLayout: {
+      hideOverlap: true
     }
   }))
 };

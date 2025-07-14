@@ -58,7 +58,7 @@ const Phase4ClosureDashboard: React.FC<Phase4ClosureDashboardProps> = ({
       setLoadingTargets(true);
       try {
         const token = await getToken();
-        const url = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${phase4TargetsListId}/items?expand=fields&$top=999`;
+        const url = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${phase4TargetsListId}/items?$expand=fields&$top=999`;
         const resp = await axios.get(url, {
           headers: { Authorization: `Bearer ${token}` },
         });

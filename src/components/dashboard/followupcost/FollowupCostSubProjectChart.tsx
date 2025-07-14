@@ -4,11 +4,14 @@ import React from "react";
 import ReactECharts from "echarts-for-react";
 import { FilterMode, FollowCostItem } from "../../../pages/types";
 
-/** Parses "DD.MM.YYYY HH:mm:ss" or "DD.MM.YYYY" */
+/** Parse "DD.MM.YYYY HH:mm:ss" or "DD.MM.YYYY" */
 function parseEuropeanDate(dateStr: string): Date {
+  const d = new Date(dateStr);
+  if (!isNaN(d.getTime())) return d;
+
   const [datePart, timePart = "00:00:00"] = dateStr.split(" ");
-  const [day, month, year]                = datePart.split(".").map(n => parseInt(n, 10));
-  const [h, m, s]                         = timePart.split(":").map(n => parseInt(n, 10));
+  const [day, month, year]               = datePart.split(".").map(Number);
+  const [h, m, s]                        = timePart.split(":").map(Number);
   return new Date(year, month - 1, day, h, m, s);
 }
 
@@ -17,13 +20,13 @@ const PALETTE = ["#5470C6", "#91CC75", "#FAC858", "#EE6666", "#73C0DE"];
 
 // Friendly titles per filterMode
 const TITLE_MAP: Record<FilterMode, string> = {
-  year:        "Total Nett Value per Sub-Project (Year)",
-  quarter:     "Total Nett Value per Sub-Project (Quarter)",
-  month:       "Total Nett Value per Sub-Project (Month)",
-  day:         "Total Nett Value per Sub-Project (Day)",
-  weekOfMonth: "Total Nett Value per Sub-Project (Week of Month)",
-  weekOfYear:  "Total Nett Value per Sub-Project (Week of Year)",
-  customRange: "Total Nett Value per Sub-Project (Custom Range)",
+  year:        "Total Nett Value per Sub-Project",
+  quarter:     "Total Nett Value per Sub-Project",
+  month:       "Total Nett Value per Sub-Project",
+  day:         "Total Nett Value per Sub-Project",
+  weekOfMonth: "Total Nett Value per Sub-Project",
+  weekOfYear:  "Total Nett Value per Sub-Project",
+  customRange: "Total Nett Value per Sub-Project",
 };
 
 interface Props {
@@ -68,22 +71,25 @@ export const FollowupCostSubProjectChart: React.FC<Props> = ({
     const d  = dt.getDate();
 
     switch (filterMode) {
-      case "year":        return y === +selectedYear;
-      case "quarter":     {
+      case "year":
+        return y === +selectedYear;
+      case "quarter": {
         if (y !== +selectedYear) return false;
         const q = +selectedQuarter;
         return m >= (q - 1) * 3 + 1 && m <= q * 3;
       }
-      case "month":       return y === +selectedYear && m === +selectedMonth;
-      case "day":         return y === +selectedYear && m === +selectedMonth && d === +selectedDay;
+      case "month":
+        return y === +selectedYear && m === +selectedMonth;
+      case "day":
+        return y === +selectedYear && m === +selectedMonth && d === +selectedDay;
       case "weekOfMonth": {
         if (y !== +selectedYear || m !== +selectedMonth) return false;
         return Math.ceil(d / 7) === selectedWeekOfMonth;
       }
-      case "weekOfYear":  {
+      case "weekOfYear": {
         if (y !== +selectedYear) return false;
         const start = new Date(y, 0, 1);
-        const wk    = Math.floor((dt.getTime() - start.getTime()) / (1000*60*60*24*7)) + 1;
+        const wk    = Math.floor((dt.getTime() - start.getTime())/(1000*60*60*24*7)) + 1;
         return wk === selectedWeekOfYear;
       }
       case "customRange": {
@@ -106,60 +112,97 @@ export const FollowupCostSubProjectChart: React.FC<Props> = ({
   const projects = Object.keys(byProject).sort();
   const values   = projects.map(p => byProject[p]);
 
-  // 3) ECharts option
+  // 3) Compute a subtitle suffix based on filterMode + selections
+  const mainTitle = TITLE_MAP[filterMode];
+
+// build a little “sub” string from your selected filters:
+let subTitle = "";
+switch (filterMode) {
+  case "year":
+    subTitle = `Year ${selectedYear}`;
+    break;
+  case "quarter":
+    subTitle = `Q${selectedQuarter} ${selectedYear}`;
+    break;
+  case "month":
+    subTitle = `${selectedMonth}/${selectedYear}`;
+    break;
+  case "day":
+    subTitle = `${selectedDay}/${selectedMonth}/${selectedYear}`;
+    break;
+  case "weekOfMonth":
+    subTitle = `W${selectedWeekOfMonth} of ${selectedMonth}/${selectedYear}`;
+    break;
+  // etc…
+  case "customRange":
+    subTitle = `From ${fromDay}/${fromMonth}/${fromYear} to ${toDay}/${toMonth}/${toYear}`;
+    break;
+}
+
+// now glue them together on one line:
+const fullTitle = subTitle
+  ? `${mainTitle} — ${subTitle}`
+  : mainTitle;
+
+  // 4) ECharts option
   const option = {
     color: PALETTE,
-    title: {
-      text: TITLE_MAP[filterMode],
-      left: "center",
-      textStyle: { fontSize: 16 },
-    },
+    title: [
+      {
+         text: fullTitle,
+        left: "center",
+        top: 16,
+        textStyle: { fontSize: 18 }
+      }
+    ],
     toolbox: {
       show: true,
-      feature: { saveAsImage: { title: "Save as Image" } },
+      feature: { saveAsImage: { title: "Save as Image" } }
     },
     tooltip: {
       trigger: "axis",
       formatter: (params: any[]) =>
-        params.map(p => `€${(p.value as number).toLocaleString()}`).join("<br/>"),
+        params
+          .map(p => `${p.axisValueLabel}: €${(p.value as number).toLocaleString()}`)
+          .join("<br/>")
     },
     xAxis: {
       type: "category",
       data: projects,
       axisLabel: { rotate: 0, fontSize: 12 },
-      axisTick:  { alignWithLabel: true },
+      axisTick:  { alignWithLabel: true }
     },
     yAxis: {
       type: "value",
       name: "€",
-      nameTextStyle: { fontSize: 16 },
-      axisLabel:     { fontSize: 14 },
+      nameTextStyle: { fontSize: 14 },
+      axisLabel:     { fontSize: 12 }
     },
     grid: {
       left: "3%",
       right: "4%",
       bottom: "15%",
-      containLabel: true,
+      containLabel: true
     },
     series: [
       {
         name: "Sub-Project",
         type: "bar",
         barWidth: 20,
-        data:     values,
+        data: values,
         label: {
-          show:            true,
-          position:        "top",
-          formatter:       (p: any) => `€${(p.value as number).toLocaleString()}`,
-          backgroundColor: "auto",
+          show:      true,
+          position:  "top",
+          formatter: (p: any) => `€${(p.value as number).toLocaleString()}`,
+           backgroundColor: "auto",
           padding:         [4, 8],
           borderRadius:    4,
           color:           "#fff",
           offset:          [0, -6],
-          fontSize:        12,
-        },
-      },
-    ],
+          fontSize: 12
+        }
+      }
+    ]
   };
 
   return <ReactECharts option={option} style={{ height: 400, width: "100%" }} />;

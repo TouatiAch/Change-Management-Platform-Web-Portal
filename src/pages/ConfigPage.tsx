@@ -7,12 +7,12 @@ import { db } from "./db"; // for Dexie usage
 import { CarImage } from "./types";
 import CarConfigurationComponent from "./CarConfigurationComponent";
 import { AVAILABLE_PROJECTS } from "../constants/projects";
-import { msalInstance } from "../auth/msalInstance";
-import { getAccessToken } from "../auth/getToken";
-import { getConfig, saveConfig, cmConfigLists, IProject } from "../services/configService";
+import { getConfig, saveConfig, IProject } from "../services/configService";
 import TopMenu from "../components/TopMenu";
 import { getProjectLogo } from "../utils/getProjectLogo";
 import AreaImageUploadComponent from "../components/AreaImageUploadComponent";
+import { lookupSiteAndLists } from "../services/siteLookupService";
+import type { ListConfig } from "../services/configService";
 
 function canonicalProjectId(input: string): string {
   let normalized = input.trim().toLowerCase().replace(/[\s_]+/g, '-');
@@ -37,10 +37,13 @@ const ConfigPage: React.FC = () => {
   const [frequentSites, setFrequentSites] = useState<string[]>([]);
   // KPI Lists
   const [questionsListId, setQuestionsListId] = useState("");
-  const [monthlyListId, setMonthlyListId] = useState("");
-  const [followCostListId, setFollowCostListId] = useState("");
-  const [budgetsListId, setBudgetsListId] = useState("");
-const [phase4TargetsListId, setPhase4TargetsListId] = useState("");
+  // KPI Lists
+  const [downtimeListId, setDowntimeListId] = useState<string>("");
+  const [drxListId, setDrxListId] = useState<string>("");
+  const [budgetsListId, setBudgetsListId] = useState<string>("");
+  const [followCostListId, setFollowCostListId] = useState<string>("");
+  const [phase4TargetsListId, setPhase4TargetsListId] = useState<string>("");
+  const [configLists, setConfigLists] = useState<ListConfig[]>([]);
 
   // Projects
   const [projects, setProjects] = useState<IProject[]>([]);
@@ -79,11 +82,9 @@ const handleSaveCarName = async () => {
     const cfg = getConfig();
     setSiteId(cfg.siteId || null);
     setQuestionsListId(cfg.questionsListId || "");
-    setMonthlyListId(cfg.monthlyListId || "");
-    setFollowCostListId(cfg.followCostListId || "");
     setProjects((cfg.projects || []).map(p => ({ ...p, logo: p.logo || getProjectLogo(p.id) })));
     setFrequentSites(cfg.frequentSites || []);
-    setPhase4TargetsListId(cfg.phase4TargetsListId || "");
+    setConfigLists(cfg.lists || []);
   } catch (err) {
     console.error("Failed to load config:", err);
   }
@@ -96,131 +97,51 @@ const handleSaveCarName = async () => {
     setCarList(allCars);
   };
   // 2) Site lookup
-    const handleSiteLookup = async (e: FormEvent) => {
-  e.preventDefault();
-  setLoadingLists(true);
-  setMessage(null);
+   const handleSiteLookup = async (e: FormEvent) => {
+    e.preventDefault();
+    setLoadingLists(true);
+    setMessage(null);
 
-  try {
-    const account = msalInstance.getActiveAccount();
-    if (!account) throw new Error("No signed-in account. Please log in.");
-    const token = await getAccessToken(msalInstance, ["https://graph.microsoft.com/Sites.Read.All"]);
-    if (!token) throw new Error("No token");
+    try {
+      const { config: newCfg, projects: newProjects, fetchedLists } = await lookupSiteAndLists(
+        siteName,
+        projects,
+        frequentSites
+      );
 
-    const url = new URL(siteName);
-    const path = `${url.hostname}:${url.pathname}:`;
-    const siteResp = await axios.get(`https://graph.microsoft.com/v1.0/sites/${path}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    setSiteId(siteResp.data.id);
-
-    const listsResp = await axios.get(
-      `https://graph.microsoft.com/v1.0/sites/${siteResp.data.id}/lists`,
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
-    const fetchedLists = listsResp.data.value;
-    setLists(fetchedLists);
-
-    // 🔍 Automatically detect target lists by display name
-    const findListIdByName = (partialName: string) =>
-      fetchedLists.find((list: any) =>
-        list.displayName.toLowerCase().includes(partialName.toLowerCase())
-      )?.id || "";
-
-    const autoQuestionsId = findListIdByName("question");
-    const autoMonthlyId = findListIdByName("monthly");
-    const autoFollowId = findListIdByName("follow");
-    const autoBudgetsId = findListIdByName("budget");
-    const autoTargetsId = findListIdByName("target");
-setBudgetsListId(autoBudgetsId);
-setPhase4TargetsListId(autoTargetsId);
-    // Set state to auto-fill the selects
-    setQuestionsListId(autoQuestionsId);
-    setMonthlyListId(autoMonthlyId);
-    setFollowCostListId(autoFollowId);
-
-    // Extract projects from naming convention
-    // Regex for list extraction (allow dashes!)
-const regex = /^changes_([a-zA-Z0-9-]+)_phase(4|8)(extra)?$/i;
-const newProjectsMap: { [key: string]: IProject } = {};
-
-fetchedLists.forEach((list: any) => {
-  const match = regex.exec(list.displayName);
-  if (!match) return;
-  const [, rawProjectName, phase, isExtra] = match;
-  const projectId = canonicalProjectId(rawProjectName);
-  const existing = newProjectsMap[projectId] || projects.find(p => canonicalProjectId(p.id) === projectId);
-
-  const updatedProject: IProject = existing
-    ? { ...existing }
-    : {
-        id: projectId,
-        displayName: rawProjectName,
-        logo: getProjectLogo(projectId),
-        mapping: {
-          implementation: "",
-          feasibilityExtra: "",
-          implementationExtra: "",
-          changeQuestionStatusListId: ""
-        },
-      };
-
-  if (phase === "4" && isExtra) updatedProject.mapping.feasibilityExtra = list.id;
-  else if (phase === "8" && isExtra) updatedProject.mapping.implementationExtra = list.id;
-  else if (phase === "8") updatedProject.mapping.implementation = list.id;
-
-  newProjectsMap[projectId] = updatedProject;
-});
-
-// Also fix ChangeQuestionStatus regex to allow dashes and canonicalize
-fetchedLists.forEach((list: any) => {
-  const cqsMatch = /^ChangeQuestionStatus_([a-zA-Z0-9-]+)$/i.exec(list.displayName);
-  if (!cqsMatch) return;
-  const [, rawProjectName] = cqsMatch;
-  const projectId = canonicalProjectId(rawProjectName);
-
-  if (!newProjectsMap[projectId]) return;
-
-  newProjectsMap[projectId].mapping.changeQuestionStatusListId = list.id;
-});
-    // ➕ Include ChangeQuestionStatus lists by project name
-fetchedLists.forEach((list: any) => {
-  const cqsMatch = /^ChangeQuestionStatus_([a-zA-Z0-9-]+)$/i.exec(list.displayName);
-  if (!cqsMatch) return;
-  const [, rawProjectName] = cqsMatch;
-  const projectId = canonicalProjectId(rawProjectName);
-if (!newProjectsMap[projectId]) return;
-newProjectsMap[projectId].mapping.changeQuestionStatusListId = list.id;
-
-});
-
-    const finalProjects = Object.values(newProjectsMap);
-    setProjects(finalProjects);
-
-    // ✅ Save everything to localStorage
-    const newConfig: cmConfigLists = {
-  siteId: siteResp.data.id,
-  questionsListId: autoQuestionsId,
-  monthlyListId: autoMonthlyId,
-  followCostListId: autoFollowId,
-  budgetsListId: autoBudgetsId, 
-  projects: finalProjects,
-  frequentSites: [...new Set([...frequentSites, siteName])],
-};
-    saveConfig(newConfig);
-
-    if (!frequentSites.includes(siteName)) {
-      setFrequentSites((prev) => [...prev, siteName]);
-      setMessage(`Added ${siteName} to frequently used sites.`);
-    } else {
-      setMessage(`${siteName} is already in your frequently used sites.`);
-    }
-  } catch (err: any) {
-    setMessage(err.response?.data?.error?.message || err.message);
-  } finally {
-    setLoadingLists(false);
+      setSiteId(newCfg.siteId);
+      setQuestionsListId(newCfg.questionsListId);
+      setProjects(newProjects);
+      setLists(fetchedLists);  
+      setFrequentSites(newCfg.frequentSites || []);
+      setConfigLists(newCfg.lists);
+      newCfg.lists.forEach(l => {
+  switch (l.name) {
+    case "downtime":
+      setDowntimeListId(l.listId);
+      break;
+    case "DRX":
+      setDrxListId(l.listId);
+      break;
+    case "Budgets":
+      setBudgetsListId(l.listId);
+      break;
+    case "FollowCostKPI":
+      setFollowCostListId(l.listId);
+      break;
+    case "Phase4Targets":
+      setPhase4TargetsListId(l.listId);
+      break;
   }
-};
+});
+
+      setMessage("✅ Site & KPI lists detected and saved!");
+    } catch (err: any) {
+      setMessage(err.message || "Lookup failed");
+    } finally {
+      setLoadingLists(false);
+    }
+  }; 
   
   // 4) Projects
   const addProjectFromDropdown = () => {
@@ -283,35 +204,25 @@ newProjectsMap[projectId].mapping.changeQuestionStatusListId = list.id;
     );
   };
 
-  // 5) Save entire config to localStorage
   const handleSave = () => {
-  if (!questionsListId || !monthlyListId || !followCostListId || !budgetsListId) {
-  setMessage("Please select all lists ");
-  return;
-}
-
-
-  for (const proj of projects) {
-    const hasImplementation = proj.mapping.implementation || proj.mapping.implementationExtra;
-    if ( !hasImplementation) {
-      setMessage(`Project "${proj.displayName}" must have at least a mapped list implementation.`);
+    if (!questionsListId) {
+      setMessage("Please select your Questions list.");
       return;
     }
-  }
+    for (const proj of projects) {
+      if (!proj.mapping.implementation && !proj.mapping.implementationExtra) {
+        setMessage(`Project "${proj.displayName}" needs a list mapping.`);
+        return;
+      }
+    }
+    const cfg = getConfig();
+    cfg.questionsListId = questionsListId;
+    cfg.projects = projects;
+    cfg.frequentSites = frequentSites;
+    saveConfig(cfg);
 
-  const newConfig: cmConfigLists = {
-  siteId: siteId || "",
-  questionsListId,
-  monthlyListId,
-  followCostListId,
-  budgetsListId, 
-  phase4TargetsListId,
-  projects,
-  frequentSites,
-};
-  saveConfig(newConfig);
-  setMessage("Configuration saved successfully!");
-};
+    setMessage("✅ Questions & Project mappings saved!");
+  };
 
   return (
     <div
@@ -357,273 +268,236 @@ newProjectsMap[projectId].mapping.changeQuestionStatusListId = list.id;
         </aside>
 
         <main className="flex-1 p-8 space-y-6 text-white">
-          {/* TAB:  lists */}
-          {activeTab === "lists" && (
-            <>
-              <h2 className="text-2xl font-semibold">List Configuration</h2>
+{/* TAB: lists */}
+{activeTab === "lists" && (
+  <>
+    <h2 className="text-2xl font-semibold">List Configuration</h2>
 
-              <form onSubmit={handleSiteLookup} className="space-y-4">
-                <label className="block">
-                  <span className="text-lg">SharePoint Site Name</span>
-                  <input
-                    type="text"
-                    value={siteName}
-                    onChange={(e) => setSiteName(e.target.value)}
-                    required
-                    className="w-full mt-1 p-2 rounded bg-white/80 text-gray-900"
-                  />
-                </label>
+    {/* 1) Site Lookup */}
+    <form onSubmit={handleSiteLookup} className="space-y-4">
+      <label className="block">
+        <span className="text-lg">SharePoint Site Name</span>
+        <input
+          type="text"
+          value={siteName}
+          onChange={e => setSiteName(e.target.value)}
+          required
+          className="w-full mt-1 p-2 rounded bg-white/80 text-gray-900"
+        />
+      </label>
+      <label className="block">
+        Frequently Used Sites
+        <select
+          onChange={e => setSiteName(e.target.value)}
+          className="w-full mt-1 p-2 rounded bg-white/80 text-gray-900"
+        >
+          <option value="">-- Select a Site --</option>
+          {frequentSites.map((s,i) => (
+            <option key={i} value={s}>{s}</option>
+          ))}
+        </select>
+      </label>
+      <button
+        type="submit"
+        disabled={loadingLists}
+        className="px-6 py-2 bg-[#1cb3d2] rounded-xl font-medium hover:opacity-90"
+      >
+        {loadingLists ? "Loading…" : "Lookup Lists"}
+      </button>
+    </form>
 
-                <div>
-                  <label className="block">
-                    Frequently Used Sites
-                    <select
-                      onChange={(e) => setSiteName(e.target.value)}
-                      className="w-full mt-1 p-2 rounded bg-white/80 text-gray-900"
-                    >
-                      <option value="">-- Select a Site --</option>
-                      {frequentSites.map((site, i) => (
-                        <option key={i} value={site}>
-                          {site}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                </div>
+    {/* 2) Once you’ve fetched, show each KPI‐list dropdown */}
+    {lists.length > 0 && (
+      <div className="space-y-6 mt-6">
 
-                <button
-                  type="submit"
-                  disabled={loadingLists}
-                  className="px-6 py-2 bg-[#1cb3d2] rounded-xl font-medium hover:opacity-90 transition"
-                >
-                  {loadingLists ? "Loading…" : "Lookup Lists"}
-                </button>
-              </form>
+        {/** Downtime */}
+        <div>
+          <label className="block">
+            Downtime List
+            <select
+              value={downtimeListId}
+              onChange={e => setDowntimeListId(e.target.value)}
+              className="w-full mt-1 p-2 rounded bg-white/80 text-gray-900"
+            >
+              <option value="">-- Select Downtime --</option>
+              {lists.map(l => (
+                <option key={l.id} value={l.id}>{l.displayName}</option>
+              ))}
+            </select>
+          </label>
+        </div>
 
-              {lists.length > 0 && (
-                <div className="space-y-6 mt-6">
-                  {/* KPI Lists */}
-                  <div>
-                    <label className="block">
-                      Questions List
-                      <select
-                        value={questionsListId}
-                        onChange={(e) => setQuestionsListId(e.target.value)}
-                        className="w-full mt-1 p-2 rounded bg-white/80 text-gray-900"
-                      >
-                        <option value="">-- Select --</option>
-                        {lists.map((l) => (
-                          <option key={l.id} value={l.id}>
-                            {l.displayName}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  </div>
-                  <div>
-  <label className="block">
-    Budgets List
-    <select
-      value={budgetsListId}
-      onChange={(e) => setBudgetsListId(e.target.value)}
-      className="w-full mt-1 p-2 rounded bg-white/80 text-gray-900"
-    >
-      <option value="">-- Select --</option>
-      {lists.map((l) => (
-        <option key={l.id} value={l.id}>
-          {l.displayName}
-        </option>
-      ))}
-    </select>
-  </label>
-</div>
-<div>
-  <label className="block">
-    Phase 4 Targets List
-    <select
-      value={phase4TargetsListId}
-      onChange={(e) => setPhase4TargetsListId(e.target.value)}
-      className="w-full mt-1 p-2 rounded bg-white/80 text-gray-900"
-    >
-      <option value="">-- Select --</option>
-      {lists.map((l) => (
-        <option key={l.id} value={l.id}>
-          {l.displayName}
-        </option>
-      ))}
-    </select>
-  </label>
-</div>
+        {/** DRX */}
+        <div>
+          <label className="block">
+            DRX Ideas List
+            <select
+              value={drxListId}
+              onChange={e => setDrxListId(e.target.value)}
+              className="w-full mt-1 p-2 rounded bg-white/80 text-gray-900"
+            >
+              <option value="">-- Select DRX --</option>
+              {lists.map(l => (
+                <option key={l.id} value={l.id}>{l.displayName}</option>
+              ))}
+            </select>
+          </label>
+        </div>
 
+        {/** Budgets */}
+        <div>
+          <label className="block">
+            Budgets List
+            <select
+              value={budgetsListId}
+              onChange={e => setBudgetsListId(e.target.value)}
+              className="w-full mt-1 p-2 rounded bg-white/80 text-gray-900"
+            >
+              <option value="">-- Select Budgets --</option>
+              {lists.map(l => (
+                <option key={l.id} value={l.id}>{l.displayName}</option>
+              ))}
+            </select>
+          </label>
+        </div>
 
-                  <div>
-                    <label className="block">
-                      Monthly KPIs List
-                      <select
-                        value={monthlyListId}
-                        onChange={(e) => setMonthlyListId(e.target.value)}
-                        className="w-full mt-1 p-2 rounded bg-white/80 text-gray-900"
-                      >
-                        <option value="">-- Select --</option>
-                        {lists.map((l) => (
-                          <option key={l.id} value={l.id}>
-                            {l.displayName}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  </div>
+        {/** FollowCostKPI */}
+        <div>
+          <label className="block">
+            Follow-up Cost List
+            <select
+              value={followCostListId}
+              onChange={e => setFollowCostListId(e.target.value)}
+              className="w-full mt-1 p-2 rounded bg-white/80 text-gray-900"
+            >
+              <option value="">-- Select FollowCostKPI --</option>
+              {lists.map(l => (
+                <option key={l.id} value={l.id}>{l.displayName}</option>
+              ))}
+            </select>
+          </label>
+        </div>
 
-                  <div>
-                    <label className="block">
-                      Follow-up Cost List
-                      <select
-                        value={followCostListId}
-                        onChange={(e) => setFollowCostListId(e.target.value)}
-                        className="w-full mt-1 p-2 rounded bg-white/80 text-gray-900"
-                      >
-                        <option value="">-- Select --</option>
-                        {lists.map((l) => (
-                          <option key={l.id} value={l.id}>
-                            {l.displayName}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  </div>
+        {/** Phase4Targets */}
+        <div>
+          <label className="block">
+            Phase 4 Targets List
+            <select
+              value={phase4TargetsListId}
+              onChange={e => setPhase4TargetsListId(e.target.value)}
+              className="w-full mt-1 p-2 rounded bg-white/80 text-gray-900"
+            >
+              <option value="">-- Select Phase4Targets --</option>
+              {lists.map(l => (
+                <option key={l.id} value={l.id}>{l.displayName}</option>
+              ))}
+            </select>
+          </label>
+        </div>
 
-                  {/* Projects */}
-                  <div>
-                    <h3 className="text-xl font-medium">Projects</h3>
-                    {projects.length === 0 && (
-                      <p className="text-sm text-white/70">
-                        No projects yet. Add one below!
-                      </p>
-                    )}
+        {/* 3) Projects mapping */}
+        <div>
+          <h3 className="text-xl font-medium">Projects</h3>
 
-                    {projects.map((proj) => (
-                      <div key={proj.id} className="mt-4 space-y-2 bg-white/10 p-4 rounded">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center">
-                            {proj.logo && (
-                              <img
-                                src={proj.logo}
-                                alt={proj.displayName}
-                                className="w-10 h-10 object-contain mr-3"
-                              />
-                            )}
-                            <span className="font-semibold">{proj.displayName}</span>
-                          </div>
-                          <button
-                            onClick={() => removeProject(proj.id)}
-                            className="ml-4 px-3 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition"
-                          >
-                            Remove
-                          </button>
-                        </div>
+          {/* Add New Project */}
+          <div className="flex items-center gap-3 mb-4">
+            <select
+              value={selectedProjectId}
+              onChange={e => setSelectedProjectId(e.target.value)}
+              className="p-2 rounded bg-white/80 text-gray-900 flex-1"
+            >
+              <option value="">-- Choose a Project --</option>
+              {AVAILABLE_PROJECTS.map(p => (
+                <option key={p.id} value={p.id}>{p.displayName}</option>
+              ))}
+            </select>
+            <button
+              onClick={addProjectFromDropdown}
+              className="px-4 py-2 bg-blue-700 text-white rounded hover:bg-blue-800"
+            >
+              + Add
+            </button>
+          </div>
 
-                        {/* Implementation (Phase 4) */}
-                        <label className="block mt-2">
-                          <span className="text-sm"> Associated List</span>
-                          <select
-                            value={proj.mapping.implementation}
-                            onChange={(e) =>
-                              handleProjectMappingChange(proj.id, "implementation", e.target.value)
-                            }
-                            className="w-full mt-1 p-2 rounded bg-white/80 text-gray-900"
-                          >
-                            <option value="">-- Select List --</option>
-                            {lists.map((l) => (
-                              <option key={l.id} value={l.id}>
-                                {l.displayName}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
+          {/* Each Project’s two mappings */}
+          {/* Each Project’s two mappings */}
+{projects.map(proj => (
+  <div key={proj.id} className="mt-4 bg-white/10 p-4 rounded space-y-2">
+    <div className="flex items-center justify-between">
+      <div className="flex items-center gap-3">
+        {proj.logo && (
+          <img
+            src={proj.logo}
+            alt={proj.displayName}
+            className="w-8 h-8 object-contain"
+          />
+        )}
+        <span className="font-semibold">{proj.displayName}</span>
+      </div>
+      <button
+        onClick={() => removeProject(proj.id)}
+        className="px-2 py-1 bg-red-600 text-white rounded"
+      >
+        Remove
+      </button>
+    </div>
 
-                        {/* Feasibility (Phase 8) */}
-                       
-                        <label className="block mt-2">
-  <span className="text-sm">Change Question Status List [Optional]</span>
-  <select
-    value={proj.mapping.changeQuestionStatusListId || ""}
-    onChange={(e) =>
-      handleProjectMappingChange(proj.id, "changeQuestionStatusListId", e.target.value)
-    }
-    className="w-full mt-1 p-2 rounded bg-white/80 text-gray-900"
-  >
-    <option value="">-- Optional --</option>
-    {lists.map((l) => (
-      <option key={l.id} value={l.id}>
-        {l.displayName}
-      </option>
-    ))}
-  </select>
-</label>
+    {/* Changes list */}
+    <label className="block">
+      Changes List
+      <select
+        value={proj.mapping.implementation}
+        onChange={e =>
+          handleProjectMappingChange(
+            proj.id,
+            "implementation",
+            e.target.value
+          )
+        }
+        className="w-full mt-1 p-2 rounded bg-white/80 text-gray-900"
+      >
+        <option value="">-- Select Changes List --</option>
+        {lists.map(l => (
+          <option key={l.id} value={l.id}>{l.displayName}</option>
+        ))}
+      </select>
+    </label>
 
-                        {/* Implementation Extra */}
-                        <label className="block mt-2">
-                          <span className="text-sm">
-                           Extra List [Optional]
-                          </span>
-                          <select
-                            value={proj.mapping.implementationExtra || ""}
-                            onChange={(e) =>
-                              handleProjectMappingChange(proj.id, "implementationExtra", e.target.value)
-                            }
-                            className="w-full mt-1 p-2 rounded bg-white/80 text-gray-900"
-                          >
-                            <option value="">-- Optional --</option>
-                            {lists.map((l) => (
-                              <option key={l.id} value={l.id}>
-                                {l.displayName}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
+    {/* ChangeQuestionStatus list */}
+    <label className="block">
+      ChangeQuestionStatus List
+      <select
+        value={proj.mapping.changeQuestionStatusListId || ""}
+        onChange={e =>
+          handleProjectMappingChange(
+            proj.id,
+            "changeQuestionStatusListId",
+            e.target.value
+          )
+        }
+        className="w-full mt-1 p-2 rounded bg-white/80 text-gray-900"
+      >
+        <option value="">-- Select Status List --</option>
+        {lists.map(l => (
+          <option key={l.id} value={l.id}>{l.displayName}</option>
+        ))}
+      </select>
+    </label>
+  </div>
+))}
 
-                       
-                      </div>
-                    ))}
-
-                    {/* Add new project */}
-                    <div className="mt-6">
-                      <h4 className="font-medium mb-2">Add a New Project</h4>
-                      <div className="flex flex-wrap items-center gap-3">
-                        <select
-                          value={selectedProjectId}
-                          onChange={(e) => setSelectedProjectId(e.target.value)}
-                          className="p-2 rounded bg-white/80 text-gray-900"
-                        >
-                          <option value="">-- Choose a Project --</option>
-                          {AVAILABLE_PROJECTS.map((p) => (
-                            <option key={p.id} value={p.id}>
-                              {p.displayName}
-                            </option>
-                          ))}
-                        </select>
-                        {selectedProjectId && (
-                          <img
-                            src={
-                              AVAILABLE_PROJECTS.find((p) => p.id === selectedProjectId)?.logo || ""
-                            }
-                            alt="Selected Project"
-                            className="w-10 h-10 object-contain"
-                          />
-                        )}
-                        <button
-                          onClick={addProjectFromDropdown}
-                          className="px-4 py-2 bg-blue-700 text-white rounded hover:bg-blue-800 transition"
-                        >
-                          + Add
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </>
-          )}
+          {/* ONLY ONE Save button */}
+          <button
+            onClick={handleSave}
+            className="mt-6 px-6 py-2 bg-[#1cb3d2] rounded-xl font-medium hover:opacity-90"
+          >
+            Save Configuration
+          </button>
+        </div>
+      </div>
+    )}
+  </>
+)}
 
           {/* TAB: cars */}
           {activeTab === "cars" && (

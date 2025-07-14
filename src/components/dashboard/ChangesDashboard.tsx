@@ -18,13 +18,8 @@ import closurePhase4Icon from "../../assets/images/phase4closure.png";
 import { getConfig } from "../../services/configService";
 import ProjectPhase4DaysTable from "./ProjectPhase4DaysTable";
 import StatsCards from "./changes/StatsCards";
-import { OpenClosedPieChart } from "./phase 4 closure/OpenClosedPieChart";
 import { ScrapPieChart } from "./scrap/ScrapPieChart";
 import { UnplannedDowntimeChart } from "./downtime/UnplannedDowntimeChart";
-import { DRXEntriesChart } from "./drx/DRXEntriesChart";
-import { DRXIdeaProgressChart } from "./drx/DRXIdeaProgressChart";
-import { BudgetDepartmentChart } from "./budget/BudgetDepartmentChart";
-import { BudgetEntriesChart } from "./budget/BudgetEntriesChart";
 import DraxlOverview from "./changes/DraxlOverview";
 import { ChangeStatusSemiPieChart } from "./phase 4 closure/ChangeStatusSemiPieChart";
 import { FollowupCostTimeSeriesChart } from "./followupcost/FollowupCostTimeSeriesChart";
@@ -32,8 +27,9 @@ import { FollowupCostByProjectReasonChart } from "./followupcost/FollowupCostByP
 import { FollowupCostByReasonTimeSeriesChart } from "./followupcost/FollowupCostByReasonTimeSeriesChart";
 import { FollowupCostSubProjectChart } from "./followupcost/FollowupCostSubProjectChart";
 import { FollowupCostProjectTimeSeriesChart } from "./followupcost/FollowupCostProjectTimeSeriesChart";
-// … other imports …
-
+import type { ListConfig } from "../../services/configService";
+import DRXEntriesChart from "./drx/DRXEntriesChart";
+import BudgetEntriesChart from "./budget/BudgetEntriesChart";
 const apiTabs = [
   { key: "changes", label: "Changes", icon: changesIcon },
   { key: "unplannedDowntime", label: "Unplanned Downtime", icon: downtimeIcon },
@@ -66,11 +62,11 @@ interface IProject {
 }
 
 interface cmConfigLists {
-  siteId: string;
-  monthlyListId: string;
-  followCostListId: string;
-  projects: IProject[];
-}
+   siteId: string;
+   questionsListId: string;
+   lists: ListConfig[];         // ← holds your downtime, DRX, Budgets, FollowCostKPI, etc.
+   projects: IProject[];
+ }
 
 interface ChangeItem {
   ID: string;
@@ -144,8 +140,6 @@ const [projects, setProjects] = useState<IProject[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [allMonthlyKPIs, setAllMonthlyKPIs] = useState<MonthlyKPIItem[]>([]);
-  const [filteredMonthlyKPIs, setFilteredMonthlyKPIs] = useState<MonthlyKPIItem[]>([]);
 const config = getConfig();
 
   // Filter mode state
@@ -188,195 +182,132 @@ const config = getConfig();
   }, [project]);
 
   useEffect(() => {
-    (async () => {
+    let cancelled = false;
+
+    const fetchData = async () => {
       setLoading(true);
       setError(null);
-      try {
-        const token = await getAccessToken(msalInstance, ["User.Read"]);
-        if (!token) throw new Error("No valid token found. Please log in again.");
-        const rawConfig = localStorage.getItem("cmConfigLists");
-        if (!rawConfig) throw new Error("No config in localStorage (cmConfigLists).");
-        let config: cmConfigLists;
-        try {
-          config = JSON.parse(rawConfig);
-          setProjects(config.projects || []);
 
-        } catch {
-          throw new Error("Failed to parse cmConfigLists from localStorage.");
-        }
-        if (!config.siteId) {
-          throw new Error("No siteId in config.");
-        }
-        const siteId = config.siteId;
-        const accumulated: ChangeItem[] = [];
+      try {
+        // ── 1️⃣ Authenticate & load config ─────────
+        const token = await getAccessToken(msalInstance, [
+          "https://graph.microsoft.com/Sites.Read.All",
+        ]);
+        if (!token) throw new Error("No token: please sign in.");
+
+        const cfg = getConfig();
+        const siteId = cfg.siteId;
+        if (!siteId) throw new Error("Missing siteId in cmConfigLists.");
+
+        // ── 2️⃣ Fetch ChangeItems ───────────────────
+        const changesAccum: ChangeItem[] = [];
         const fetchListItems = async (listId: string) => {
-          let nextLink = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listId}/items?expand=fields&$top=2000`;
+          let nextLink = `https://graph.microsoft.com/v1.0/sites/${siteId}` +
+                         `/lists/${listId}/items?expand=fields&$top=2000`;
           while (nextLink) {
             const resp = await axios.get(nextLink, {
               headers: { Authorization: `Bearer ${token}` },
             });
             if (!Array.isArray(resp.data.value)) {
-              throw new Error("Missing array at resp.data.value from SharePoint.");
+              throw new Error("Expected array at resp.data.value");
             }
             const pageItems = resp.data.value.map((it: any) => ({
-              ID: it.id,
-              SheetName: it.fields.SheetName,
-              Constructedspace: it.fields.Constructedspace,
-              Status: it.fields.Status,
-              EnddatePhase4: it.fields.EnddatePhase4,
-              EnddatePAVPhase4: it.fields.EnddatePAVPhase4,
-              EnddatePhase8: it.fields.EnddatePhase8,
+              ID:                it.id,
+              SheetName:         it.fields.SheetName,
+              Constructedspace:  it.fields.Constructedspace,
+              Status:            it.fields.Status,
+              EnddatePhase4:     it.fields.EnddatePhase4,
+              EnddatePAVPhase4:  it.fields.EnddatePAVPhase4,
+              EnddatePhase8:     it.fields.EnddatePhase8,
               EnddateProcessinfo:it.fields.EnddateProcessinfo,
-              processyear: it.fields.processyear,
-              processmonth: it.fields.processmonth,
-              processday: it.fields.processday,
-              OEM: it.fields.OEM, 
-              Scrap:it.fields.Scrap,
+              processyear:       it.fields.processyear,
+              processmonth:      it.fields.processmonth,
+              processday:        it.fields.processday,
+              OEM:               it.fields.OEM,
+              Scrap:             it.fields.Scrap,
             })) as ChangeItem[];
-            accumulated.push(...pageItems);
+            changesAccum.push(...pageItems);
             nextLink = resp.data["@odata.nextLink"] || "";
           }
         };
-        if (project?.toLowerCase() === "draxlmaeir") {
-          const validProjects = config.projects.filter(
-            (p) => p.mapping.implementation
-          );
-          if (!validProjects.length) {
-            throw new Error("No valid subprojects found for 'draxlmaeir'.");
-          }
-          for (const sub of validProjects) {
-            const listId = sub.mapping.implementation;
-            if (listId) {
-              await fetchListItems(listId);
-            }
-          }
-        } else {
-          // Single project
-          const found = config.projects.find(
-            (p) => p.id.toLowerCase() === project?.toLowerCase()
-          );
-          if (!found) {
-            throw new Error(`No project with id='${project}' found in config.`);
-          }
-          const listId = found.mapping.implementation;
-          if (!listId) {
-            throw new Error(
-              `Project '${found.displayName}' missing implementation list.`
-            );
-          }
-          await fetchListItems(listId);
-        }
-        setAllItems(accumulated);
 
-        // 2) Fetch Monthly KPI data
-        if (config.monthlyListId) {
-          const kpiAccumulated: MonthlyKPIItem[] = [];
-          const fetchMonthlyKPIs = async (listId: string) => {
-            let nextLink = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listId}/items?expand=fields&$top=2000`;
+        // If “draxlmaeir” aggregate all sub–projects, else just the one mapping
+        if (project?.toLowerCase() === "draxlmaeir") {
+          const subs = cfg.projects.filter(p => p.mapping.implementation);
+          if (!subs.length) throw new Error("No sub–projects for 'draxlmaeir'.");
+          await Promise.all(
+            subs.map(p => fetchListItems(p.mapping.implementation))
+          );
+        } else {
+          const p = cfg.projects.find(p => p.id.toLowerCase() === project?.toLowerCase());
+          if (!p || !p.mapping.implementation) {
+            throw new Error(`Project '${project}' has no implementation list.`);
+          }
+          await fetchListItems(p.mapping.implementation);
+        }
+
+        if (!cancelled) {
+          setAllItems(changesAccum);
+        }
+
+        // ── 3️⃣ Fetch Follow-Up Cost KPI ────────────
+        const followCfg = cfg.lists.find(l => l.name === "FollowCostKPI");
+        if (!followCfg) {
+          console.warn("FollowCostKPI not found in config.lists");
+          if (!cancelled) setFollowCostItems([]);
+        } else {
+          const followAccum: FollowCostItem[] = [];
+          const fetchFollowCost = async (listId: string) => {
+            let nextLink = `https://graph.microsoft.com/v1.0/sites/${siteId}` +
+                           `/lists/${listId}/items?expand=fields&$top=2000`;
             while (nextLink) {
               const resp = await axios.get(nextLink, {
                 headers: { Authorization: `Bearer ${token}` },
               });
-              if (!Array.isArray(resp.data.value)) {
-                throw new Error("Missing array at resp.data.value from SharePoint.");
-              }
-              const pageItems = resp.data.value.map((it: any) => ({
-  ID: it.id,
-  Project: it.fields.Project,
-  year: it.fields.year,
-  Month: it.fields.Month,
-  Monthid: it.fields.Monthid,
-  DRXIdeasubmittedIdea: Number(it.fields.DRXIdeasubmittedIdea)      || 0,
-  DRXIdeasubmittedIdeaGoal: Number(it.fields.DRXIdeasubmittedIdeaGoal) || 0,
-  productionminutes: Number(it.fields.productionminutes)             || 0,
-  downtime: Number(it.fields.downtime)                              || 0,
-  rateofdowntime: Number(it.fields.rateofdowntime)                  || 0,
-  Targetdowntime: Number(it.fields.Targetdowntime)                  || 0,
-  seuildinterventiondowntime: Number(it.fields.seuildinterventiondowntime) || 0,
-})) as MonthlyKPIItem[];
-
-              kpiAccumulated.push(...pageItems);
+              resp.data.value.forEach((it: any) => {
+                followAccum.push({
+                  ID:                 it.id,
+                  Project:            it.fields.Project,
+                  Area:               it.fields.Area,
+                  Carline:            it.fields.Carline,
+                  InitiationReasons:  it.fields.InitiationReasons,
+                  BucketID:           it.fields.BucketID,
+                  Date:               it.fields.Date,
+                  Statut:             it.fields.Statut,
+                  Quantity:           Number(it.fields.Quantity)       || 0,
+                  NettValue:          Number(it.fields.NettValue)      || 0,
+                  TotalNettValue:     Number(it.fields.TotalNettValue) || 0,
+                  Currency:           it.fields.Currency,
+                  BucketResponsible:  it.fields.BucketResponsible,
+                  PostnameID:         it.fields.PostnameID,
+                  Topic:              it.fields.Topic,
+                });
+              });
               nextLink = resp.data["@odata.nextLink"] || "";
             }
           };
-          await fetchMonthlyKPIs(config.monthlyListId);
-          setAllMonthlyKPIs(kpiAccumulated);
-
-          // 3) Fetch FollowCost data
-          if (config.followCostListId) {
-            const followCostAccumulated: FollowCostItem[] = [];
-            const fetchFollowCostKPIs = async (listId: string) => {
-              let nextLink = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listId}/items?expand=fields&$top=2000`;
-              while (nextLink) {
-                const resp = await axios.get(nextLink, {
-                  headers: { Authorization: `Bearer ${token}` },
-                });
-                const pageItems = resp.data.value.map((it: any) => ({
-                 ID: it.id,
-  Project:              it.fields.Project,
-  Area:                 it.fields.Area,
-  Carline:              it.fields.Carline,
-  InitiationReasons:    it.fields.InitiationReasons,
-  BucketID:             it.fields.BucketID,
-  Date:                 it.fields.Date,
-  Statut:               it.fields.Statut,
-  Quantity:             Number(it.fields.Quantity)      || 0,
-  NettValue:            Number(it.fields.NettValue)     || 0,
-  TotalNettValue:       Number(it.fields.TotalNettValue)|| 0,
-  Currency:             it.fields.Currency,
-  BucketResponsible:    it.fields.BucketResponsible,
-  PostnameID:           it.fields.PostnameID,
-  Topic:                it.fields.Topic,
-                }));
-                followCostAccumulated.push(...pageItems);
-                nextLink = resp.data["@odata.nextLink"] || "";
-              }
-            };
-            await fetchFollowCostKPIs(config.followCostListId);
-            setFollowCostItems(followCostAccumulated);
+          await fetchFollowCost(followCfg.listId);
+          if (!cancelled) {
+            setFollowCostItems(followAccum);
           }
         }
       } catch (err: any) {
-        console.error("Error:", err);
-        setError(err.message || String(err));
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, [project]);
-  // Monthly KPI Filtering
-  useEffect(() => {
-    if (!allMonthlyKPIs.length) {
-      setFilteredMonthlyKPIs([]);
-      return;
-    }
-    const newFiltered = allMonthlyKPIs.filter((item) => {
-      const itemMonthNum = parseInt(item.Monthid, 10);
-      if (isNaN(itemMonthNum)) return false;
-      if (itemMonthNum < 1) return false;
-
-      switch (filterMode) {
-        case "month":
-          return item.year === selectedYear && itemMonthNum === parseInt(selectedMonth);
-        case "quarter": {
-          if (item.year !== selectedYear) return false;
-          const q = parseInt(selectedQuarter, 10);
-          const minM = (q - 1) * 3 + 1;
-          const maxM = q * 3;
-          return itemMonthNum >= minM && itemMonthNum <= maxM;
+        console.error(err);
+        if (!cancelled) {
+          setError(err.message || String(err));
         }
-        default:
-          return true;
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
-    });
-    setFilteredMonthlyKPIs(newFiltered);
-  }, [
-    allMonthlyKPIs,
-    filterMode,
-    selectedYear,
-    selectedMonth,
-    selectedQuarter,
-  ]);
+    };
+
+    fetchData();
+    return () => {
+      cancelled = true;
+    };
+  }, [project]);
 
   // Change Items Filtering
   useEffect(() => {
@@ -667,31 +598,33 @@ const config = getConfig();
           {/* --- CLOSURE PHASE 4 --- */}
           {selectedApi === "closurePhase4" && (
             <>
-            <div className="bg-white rounded-lg shadow-md p-6">
+            <div className="bg-white rounded-lg shadow-md p-6 col-span-2">
            <ChangeStatusSemiPieChart items={filteredItems} />
          </div>
-         <div className="bg-white rounded-lg shadow-md p-6">
-                <OpenClosedPieChart items={filteredItems} type="phase4" />
-              </div>
-              <div className="bg-white rounded-lg shadow-md p-6">
-                <OpenClosedPieChart items={filteredItems} type="pav" />
-              </div>
-              <div className="bg-white rounded-lg shadow-md p-6">
-                <OpenClosedPieChart items={filteredItems} type="phase8" />
-              </div>
+     
   <div className="bg-white rounded-lg shadow-md p-6 col-span-2">
- <ProjectPhase4DaysTable
-      projects={projects}
-      changeItems={allItems}
-      phase4TargetsListId={config.phase4TargetsListId}
-      siteId={config.siteId}
-      getToken={async () => {
-        const tok = await getAccessToken(msalInstance, ["User.Read"]);
-        if (!tok) throw new Error("No token");
-        return tok;
-      }}
-    />
-  </div>
+  <ProjectPhase4DaysTable
+    projects={config.projects}
+    changeItems={allItems}
+    phase4TargetsListId={
+      (() => {
+        const phaseCfg = config.lists.find(l => l.name === "Phase4Targets");
+        if (!phaseCfg) {
+          // you could render an error component instead of throwing
+          throw new Error("Phase4Targets list not found in configuration");
+        }
+        return phaseCfg.listId;
+      })()
+    }
+    siteId={config.siteId}
+    getToken={async () => {
+      // writing also requires Manage.All
+      const tok = await getAccessToken(msalInstance, ["Sites.Manage.All"]);
+      if (!tok) throw new Error("No token");
+      return tok;
+    }}
+  />
+</div>
   </>
 )}
 
@@ -699,7 +632,7 @@ const config = getConfig();
           {selectedApi === "unplannedDowntime" && (
             <div className="bg-white rounded-lg shadow-md p-6 col-span-2">
               <h2 className="text-xl font-semibold mb-2">Unplanned Downtime</h2>
-              <UnplannedDowntimeChart data={filteredMonthlyKPIs} selectedProject={project?.toLowerCase() || ""}/>
+              <UnplannedDowntimeChart selectedProject={project?.toLowerCase() || ""}/>
             </div>
           )}
 
@@ -846,52 +779,30 @@ const config = getConfig();
   )}
             </>
           )}
+{/* --- DRX IDEA --- */}
+{selectedApi === "drxIdea" && (
+  <>
+    <div className="bg-white rounded-lg shadow-md p-6 col-span-2">
+      <h2 className="text-xl font-semibold mb-2">
+        Detailed DRX Idea Entries
+      </h2>
+      <DRXEntriesChart />
+    </div>
+  </>
+)}
 
-          {/* --- DRX IDEA --- */}
-          {selectedApi === "drxIdea" && (
-            <>
-              <div className="bg-white rounded-lg shadow-md p-6">
-                <h2 className="text-xl font-semibold mb-2">
-                  Detailed DRX Idea Entries
-                </h2>
-                <DRXEntriesChart
-                  data={filteredMonthlyKPIs}
-                  filterMode={filterMode as "month" | "quarter" | "year"}
-                />
-              </div>
-              <div className="bg-white rounded-lg shadow-md p-6">
-                <h2 className="text-xl font-semibold mb-2">DRX Idea Progress</h2>
-                <DRXIdeaProgressChart
-                  data={filteredMonthlyKPIs}
-                  filterMode={filterMode as "month" | "quarter" | "year"}
-                />
-              </div>
-            </>
-          )}
+{/* --- BUDGET --- */}
+{selectedApi === "budget" && (
+  <>
+    <div className="bg-white rounded-lg shadow-md p-6 col-span-2">
+      <h2 className="text-xl font-semibold mb-2">
+        Detailed Budget Entries
+      </h2>
+      <BudgetEntriesChart />
+    </div>
+  </>
+)}
 
-          {/* --- BUDGET --- */}
-          {selectedApi === "budget" && (
-            <>
-              <div className="bg-white rounded-lg shadow-md p-6">
-                <h2 className="text-xl font-semibold mb-2">
-                  Budget Department
-                </h2>
-                <BudgetDepartmentChart
-                  data={filteredMonthlyKPIs}
-                  filterMode={filterMode as "month" | "quarter" | "year"}
-                />
-              </div>
-              <div className="bg-white rounded-lg shadow-md p-6">
-                <h2 className="text-xl font-semibold mb-2">
-                  Detailed Budget Entries
-                </h2>
-                <BudgetEntriesChart
-                  data={filteredMonthlyKPIs}
-                  filterMode={filterMode as "month" | "quarter" | "year"}
-                />
-              </div>
-            </>
-          )}
         </div>
       </div>
     </div>

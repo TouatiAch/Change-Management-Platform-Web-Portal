@@ -1,9 +1,12 @@
+// src/components/FollowUpExcelUploader.tsx
+
 import React, { useState, useEffect } from "react";
 import * as XLSX from "xlsx";
 import axios from "axios";
 import { getAccessToken } from "../../auth/getToken";
 import { msalInstance } from "../../auth/msalInstance";
 import ProjectCarousel from "../../components/ProjectCarousel";
+import { useNavigate } from "react-router-dom";
 
 interface IProject {
   id: string;
@@ -46,7 +49,6 @@ function extractCarlines(parameters: string): string[] {
     .map((c) => c.trim())
     .filter(Boolean);
 }
-
 const FollowUpExcelUploader: React.FC<UploadProps> = ({
   siteId,
   listId,
@@ -62,7 +64,7 @@ const FollowUpExcelUploader: React.FC<UploadProps> = ({
   const [bulkProjectId, setBulkProjectId] = useState("");
   const [bulkCarline, setBulkCarline] = useState("");
   const [bulkProjectCarlines, setBulkProjectCarlines] = useState<string[]>([]);
-
+const navigate = useNavigate();
   // Pagination
   const [page, setPage] = useState(1);
   const totalPages = Math.ceil(rows.length / ROWS_PER_PAGE);
@@ -110,84 +112,119 @@ const FollowUpExcelUploader: React.FC<UploadProps> = ({
       }
     })();
   }, [bulkProjectId, projects, siteId]);
-
   // Parse the uploaded Excel (“Data” sheet)
- // … inside your component …
+  const handleFileUpload = async (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setMsg(null);
+    setLoading(true);
+    try {
+      const data = await file.arrayBuffer();
+      const wb = XLSX.read(data);
+      const sheet = wb.Sheets["Data"];
 
-const handleFileUpload = async (
-  e: React.ChangeEvent<HTMLInputElement>
-) => {
-  const file = e.target.files?.[0];
-  if (!file) return;
-  setMsg(null);
-  setLoading(true);
+      const rowsAsJson: any[] = XLSX.utils.sheet_to_json(sheet, {
+  defval: "",
+  blankrows: false,
+});
+console.log("❓ Excel headers:", rowsAsJson.length && Object.keys(rowsAsJson[0]));
 
-  try {
-    const data = await file.arrayBuffer();
-    const wb = XLSX.read(data);
-    const sheet = wb.Sheets["Data"];
-    if (!sheet) throw new Error("Missing ‘Data’ sheet");
+// 2) If it looks like “Date” or “CREÉ LE” or something else, note it.
 
-    // 1) Skip blank rows at the XLSX level…
-    const raw: any[] = XLSX.utils.sheet_to_json(sheet, {
-      defval: "",
-      blankrows: false,
-    });
+// 3) Then, when you parse each row, log the raw date cell:
 
-    // 2) …then filter out any rows with no panier number
-    const filtered = raw.filter(
-      (r) => String(r["Numéro du panier"]).trim() !== ""
-    );
+      if (!sheet) throw new Error("Missing ‘Data’ sheet");
 
-    // 3) Map only your real rows
-    const parsed: EditableRow[] = filtered.map((r) => {
-      // your existing date‐parsing logic…
-      let dateVal = "";
-      const c = r["Créé le"];
-      if (typeof c === "number") {
-        const d = XLSX.SSF.parse_date_code(c);
-        dateVal = new Date(Date.UTC(d.y, d.m - 1, d.d))
-          .toISOString()
-          .slice(0, 10);
-      } else if (c instanceof Date) {
-        dateVal = c.toISOString().slice(0, 10);
-      } else if (typeof c === "string") {
-        const [p1, p2, p3] = c.split(/[-]/);
-        if (p3 && p2 && p1.length !== 4) {
-          dateVal = `${p3}-${p2.padStart(2, "0")}-${p1.padStart(2, "0")}`;
-        } else {
-          dateVal = c;
+      const raw: any[] = XLSX.utils.sheet_to_json(sheet, {
+        defval: "",
+        blankrows: false,
+      });
+
+      // You can uncomment this to verify your headers:
+      // console.log("Headers:", raw.length && Object.keys(raw[0]));
+
+      const parsed: EditableRow[] = raw.map((r, idx) => {
+  // pick the right property name from step (1):
+  
+        // —— Robust date parsing —— 
+        const rawDate = r["Créé le"] ?? r["Date"] ?? r["date"] ?? "";
+  let dateVal = "";
+
+        if (typeof rawDate === "number") {
+          // Excel serial number
+          const d = XLSX.SSF.parse_date_code(rawDate);
+          dateVal = new Date(
+            Date.UTC(d.y, d.m - 1, d.d, d.H, d.M, d.S)
+          )
+            .toISOString()
+            .slice(0, 10);
+
+        } else if (rawDate instanceof Date) {
+          // JS Date object
+          dateVal = rawDate.toISOString().slice(0, 10);
+
+        } else if (typeof rawDate === "string") {
+          // Try “DD.MM.YYYY HH:MM:SS”
+          const m = rawDate.match(
+            /^(\d{1,2})\.(\d{1,2})\.(\d{4})(?:\s+(\d{1,2}):(\d{2}):(\d{2}))?$/
+          );
+          if (m) {
+            const [, day, mon, yr, hr = "0", min = "0", sec = "0"] = m;
+            const dt = new Date(
+              Number(yr),
+              Number(mon) - 1,
+              Number(day),
+              Number(hr),
+              Number(min),
+              Number(sec)
+            );
+            dateVal = dt.toISOString().slice(0, 10);
+
+          } else {
+            // Fallback for “DD-MM-YYYY” or other
+            const [p1, p2, p3] = rawDate.split(/[-]/);
+            if (p3 && p2 && p1.length !== 4) {
+              dateVal = `${p3}-${p2.padStart(2, "0")}-${p1.padStart(2, "0")}`;
+            } else {
+              dateVal = rawDate;
+            }
+          }
         }
-      }
 
-      return {
-        BucketID:          r["Numéro du panier"]         || "",
-        Area:              r["Zone"]                     || "",
-        Carline:           "",
-        Topic:             r["Topic"]                    || "",
-        Project:           "",
-        InitiationReasons: "",
-        Date:              dateVal,
-        Statut:            r["Statut"]                   || "",
-        Quantity:          Number(r["Quantité"]          || 0),
-        NettValue:         Number(r["Valeur nette"]       || 0),
-        TotalNettValue:    Number(r["Valeur nette totale"]|| 0),
-        Currency:          r["Devise"]                   || "",
-        BucketResponsible: r["Nom du panier"]            || "",
-        PostnameID:        r["Nom du poste"]             || "",
-        selected:          false,
-      };
-    });
+        // Optional debug:
+        // console.log(`Row ${idx}: rawDate=`, rawDate, "→ dateVal=", dateVal);
+console.log(
+    `Row ${idx} → rawDateCell=`, rawDate,
+    `→ parsed dateVal=`, dateVal
+  );
+        return {
+          BucketID:          r["Numéro du panier"]         || "",
+          Carline:           "",
+          Topic:             r["Topic"]                    || "",
+          Project:           "",
+          InitiationReasons: "",
+          Date:              dateVal,
+          Statut:            r["Statut"]                   || "",
+          Quantity:          Number(r["Quantité"]          || 0),
+          NettValue:         Number(r["Valeur nette"]       || 0),
+          TotalNettValue:    Number(r["Valeur nette totale"]|| 0),
+          Currency:          r["Devise"]                   || "",
+          BucketResponsible: r["Nom du panier"]            || "",
+          PostnameID:        r["Nom du poste"]             || "",
+          selected:          false,
+        } as EditableRow;
+      });
 
-    setRows(parsed);
-    setPage(1);
-  } catch (err: any) {
-    setMsg("Erreur: " + err.message);
-  } finally {
-    setLoading(false);
-  }
-};
-
+      setRows(parsed);
+      setPage(1);
+    } catch (err: any) {
+      setMsg("Erreur: " + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
   // Edit a single cell
   const changeRow = <K extends keyof EditableRow>(
     idx: number,
@@ -211,7 +248,7 @@ const handleFileUpload = async (
       rs.map((r, idx) => (idx === i ? { ...r, selected: chk } : r))
     );
 
-  // Bulk‐apply Project & Carline only
+  // Bulk‐apply Project/Zone/Carline
   const applyBulk = () => {
     setRows((rs) =>
       rs.map((r) =>
@@ -221,8 +258,7 @@ const handleFileUpload = async (
       )
     );
   };
-
-  // Upload to SP (no changes here)
+  // Upload to SP
   const uploadAll = async () => {
     setLoading(true);
     setMsg(null);
@@ -230,22 +266,40 @@ const handleFileUpload = async (
       const token = await getAccessToken(msalInstance, [
         "https://graph.microsoft.com/Sites.Manage.All",
       ]);
+
       const valid = rows.filter(
         (r) =>
-          r.selected && r.Project && r.Carline && r.InitiationReasons
+          r.selected && r.Project  && r.Carline && r.InitiationReasons
       );
       if (!valid.length) {
         setMsg(
-          "Veuillez sélectionner et remplir Project, Carline et Raison."
+          "Veuillez sélectionner et remplir Project, Zone, Carline et Raison."
         );
         setLoading(false);
         return;
       }
+
       for (let r of valid) {
-        const { selected, ...fields } = r;
+        // only send exactly these fields:
+        const payloadFields = {
+          Project:           r.Project,
+          Carline:           r.Carline,
+          InitiationReasons: r.InitiationReasons,
+          BucketID:          r.BucketID,
+          Date:              r.Date,
+          Statut:            r.Statut,
+          Quantity:          r.Quantity,
+          NettValue:         r.NettValue,
+          TotalNettValue:    r.TotalNettValue,
+          Currency:          r.Currency,
+          BucketResponsible: r.BucketResponsible,
+          PostnameID:        r.PostnameID,
+          Topic:             r.Topic,
+        };
+
         await axios.post(
           `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listId}/items`,
-          { fields },
+          { fields: payloadFields },
           {
             headers: {
               Authorization: `Bearer ${token}`,
@@ -254,6 +308,7 @@ const handleFileUpload = async (
           }
         );
       }
+
       setMsg("Importation terminée !");
       setRows([]);
       onComplete?.();
@@ -265,7 +320,6 @@ const handleFileUpload = async (
       setLoading(false);
     }
   };
-
   return (
     <div className="space-y-6">
       {/* 1) File picker */}
@@ -291,7 +345,9 @@ const handleFileUpload = async (
             />
 
             <div className="flex flex-wrap items-center gap-4">
-              {/* Carline (dynamic) */}
+              
+
+              {/* Carline */}
               <select
                 value={bulkCarline}
                 onChange={(e) => setBulkCarline(e.target.value)}
@@ -324,14 +380,9 @@ const handleFileUpload = async (
             <table className="min-w-max w-full text-white text-sm">
               <thead>
                 <tr>
-                  <th>
-                    <input
-                      type="checkbox"
-                      checked={allSel}
-                      onChange={(e) => toggleAll(e.target.checked)}
-                    />
-                  </th>
+                  <th><input type="checkbox" checked={allSel} onChange={(e) => toggleAll(e.target.checked)} /></th>
                   <th>Panier ID</th>
+                  <th>Zone</th>
                   <th>Carline</th>
                   <th>Topic</th>
                   <th>Projet</th>
@@ -353,9 +404,7 @@ const handleFileUpload = async (
                       <td>
                         <input
                           value={r.BucketID}
-                          onChange={(e) =>
-                            changeRow(idx, "BucketID", e.target.value)
-                          }
+                          onChange={(e) => changeRow(idx, "BucketID", e.target.value)}
                           className="w-28 p-1 text-black"
                         />
                       </td>
@@ -363,42 +412,29 @@ const handleFileUpload = async (
                       <td>
                         <input
                           value={r.Topic}
-                          onChange={(e) =>
-                            changeRow(idx, "Topic", e.target.value)
-                          }
+                          onChange={(e) => changeRow(idx, "Topic", e.target.value)}
                           className="w-32 p-1 text-black"
                         />
                       </td>
-                      <td>
-                        {
-                          projects.find((p) => p.id === r.Project)
-                            ?.displayName
-                        }
-                      </td>
+                      <td>{projects.find((p) => p.id === r.Project)?.displayName}</td>
                       <td>
                         <select
                           value={r.InitiationReasons}
-                          onChange={(e) =>
-                            changeRow(
-                              idx,
-                              "InitiationReasons",
-                              e.target.value
-                            )
-                          }
+                          onChange={(e) => changeRow(idx, "InitiationReasons", e.target.value)}
                           className="p-1 text-black"
                         >
                           <option value="">– Raison –</option>
-                          <option value="demande à la suite d'un mail/réunion d'analyse de réclamation">
-                            demande à la suite d'un mail/réunion d'analyse de réclamation
-                          </option>
                           <option value="demande suite à un changement technique (aeb)">
                             demande suite à un changement technique (aeb)
                           </option>
                           <option value="demande suite une optimisation">
                             demande suite une optimisation
                           </option>
+                          <option value="demande à la suite d'un mail/réunion d'analyse de réclamation">
+                           demande à la suite d'un mail/réunion d'analyse de réclamation
+                          </option>
                           <option value="suite demande PT">
-                            suite demande PT
+                          suite demande PT
                           </option>
                         </select>
                       </td>
@@ -417,9 +453,7 @@ const handleFileUpload = async (
               >
                 ← Prev
               </button>
-              <span>
-                Page {page} / {totalPages}
-              </span>
+              <span>Page {page} / {totalPages}</span>
               <button
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                 disabled={page === totalPages}
@@ -428,7 +462,12 @@ const handleFileUpload = async (
                 Next →
               </button>
             </div>
-
+<button
+          onClick={() => navigate("/follow-cost-editor")}
+          className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl shadow-md text-sm transition"
+        >
+          Go to FollowUpCost List
+        </button>
             {/* upload */}
             <button
               onClick={uploadAll}

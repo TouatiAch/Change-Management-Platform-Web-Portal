@@ -54,15 +54,25 @@ const FollowCostKPIEditor: React.FC = () => {
   const navigate = useNavigate();
 
   // 1) Load siteId & listId from localStorage
-  useEffect(() => {
-    const raw = localStorage.getItem(LISTS_CONFIG_KEY);
-    if (!raw) return;
-    try {
-      const cfg = JSON.parse(raw);
-      if (cfg.siteId) setSiteId(cfg.siteId);
-      if (cfg.followCostListId) setListId(cfg.followCostListId);
-    } catch {}
-  }, []);
+// 1) Load siteId & listId from localStorage
+useEffect(() => {
+  const raw = localStorage.getItem(LISTS_CONFIG_KEY);
+  if (!raw) return;
+  try {
+    const cfg = JSON.parse(raw);
+    if (cfg.siteId) setSiteId(cfg.siteId);
+
+    // === instead of cfg.followCostListId ===
+    const follow = cfg.lists?.find((l: any) => l.name === "FollowCostKPI");
+    if (follow?.listId) {
+      setListId(follow.listId);
+    } else {
+      console.warn("FollowCostKPI listId not found in config", cfg.lists);
+    }
+  } catch (e) {
+    console.error("Failed to parse cmConfigLists:", e);
+  }
+}, []);
 
   // 2) Fetch all items
   useEffect(() => {

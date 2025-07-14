@@ -4,14 +4,19 @@ import React from "react";
 import ReactECharts from "echarts-for-react";
 import { FilterMode, FollowCostItem } from "../../../pages/types";
 
-/** same date‐parser you already have */
+/** Parse "DD.MM.YYYY HH:mm:ss" or "DD.MM.YYYY" */
 function parseEuropeanDate(dateStr: string): Date {
+  const d = new Date(dateStr);
+  if (!isNaN(d.getTime())) {
+    return d;
+  }
+
+  // 2) Fallback to European style "DD.MM.YYYY[ HH:mm:ss]"
   const [datePart, timePart = "00:00:00"] = dateStr.split(" ");
-  const [day, month, year]                = datePart.split(".").map(n => parseInt(n, 10));
-  const [h, m, s]                         = timePart.split(":").map(n => parseInt(n, 10));
+  const [day, month, year]               = datePart.split(".").map(Number);
+  const [h, m, s]                        = timePart.split(":").map(Number);
   return new Date(year, month - 1, day, h, m, s);
 }
-
 interface Props {
   data: FollowCostItem[];
   filterMode: FilterMode;

@@ -1,26 +1,52 @@
-// src/components/dashboard/downtime/aggregateSeries.ts
-
 import type { SeriesOption } from "echarts";
-import type { DowntimeRecord } from "./types";
+import { DowntimeRecord } from "./types";
 
+/**
+ * Build a bar‐series for a single project.
+ */
+export function makeProjectDowntimeSeries(
+  records: DowntimeRecord[],
+  monthLabels: string[],
+  getMonthName: (m: string) => string,
+  project: string
+): SeriesOption {
+  return {
+    name: project,
+    type: "bar",
+    data: monthLabels.map(label => {
+      const [mName, yr] = label.split(" ");
+      return records
+        .filter(r =>
+          r.Project === project &&
+          getMonthName(r.Monthid) === mName &&
+          r.year === yr
+        )
+        .reduce((sum, r) => sum + (r.downtime || 0), 0);
+    }),
+    yAxisIndex: 0,
+  };
+}
+
+/**
+ * Build a single bar‐series that sums downtime across *all* projects.
+ */
 export function makeAggregateDowntimeSeries(
   records: DowntimeRecord[],
   monthLabels: string[],
-  getMonthName: (monthId: string) => string
+  getMonthName: (m: string) => string
 ): SeriesOption {
-  // for each month label, sum downtime over all records matching that month/year
-  const data = monthLabels.map(label => {
-    const [monthName, year] = label.split(" ");
-    return records
-      .filter(r => getMonthName(r.Monthid) === monthName && r.year === year)
-      .reduce((sum, r) => sum + parseFloat(String(r.downtime || 0)), 0);
-  });
-
   return {
     name: "Total Downtime (min)",
     type: "bar",
-    data,
+    data: monthLabels.map(label => {
+      const [mName, yr] = label.split(" ");
+      return records
+        .filter(r =>
+          getMonthName(r.Monthid) === mName &&
+          r.year === yr
+        )
+        .reduce((sum, r) => sum + (r.downtime || 0), 0);
+    }),
     yAxisIndex: 0,
-    itemStyle: { color: "#fdae61" },
   };
 }

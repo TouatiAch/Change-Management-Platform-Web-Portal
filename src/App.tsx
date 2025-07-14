@@ -10,85 +10,108 @@ import ChangeItemsImplementation from "./pages/ChangeItemsImplementation";
 import ChangeItemsFeasibility    from "./pages/ChangeItemsFeasibility";
 import DetailsImplementation     from "./pages/DetailsImplementation";
 import DetailsFeasibility        from "./pages/DetailsFeasibility";
-//import SendEmailPage             from "./pages/SendEmailPage22";
 import NotFoundPage              from "./pages/NotFoundPage";
+
+import DashboardHome             from "./pages/DashboardHome";
+import DashboardPage             from "./pages/DashboardPage";
+import DashboardLayout           from "./components/dashboard/DashboardLayout";
+
+import AddQuestionPage           from "./pages/AddQuestionPage";
+import QuestionsListPage         from "./pages/QuestionsListPage";
+import SendEmailPage             from "./pages/SendEmailPage";
+import ResponsePage              from "./pages/ResponsePage";
+
+import ToolSelectionPage         from "./pages/ToolSelectionPage";
+import SharePointUploaderPage    from "./pages/SharePointUploaderPage";
+
+import ScrapFollowingSection     from "./pages/ScrapFollowingSection";
+import DRXKPIEditor              from "./pages/DRXKPIEditor";
+import DowntimeKPIEditor         from "./pages/DowntimeKPIEditor";
+import BudgetKPIEditor           from "./pages/BudgetKPIEditor";
+import FollowCostKPIEditor       from "./pages/FollowCostKPIEditor";
+
 import KPIInputPage              from "./pages/KPIInputPage";
+import Phase4KPIInput            from "./components/kpiEntry/Phase4KPIInput";
+import FollowUpExcelUploader     from "./components/kpiEntry/FollowUpExcelUploader";
 
-import DashboardPage   from "./pages/DashboardPage";
-import DashboardLayout from "./components/dashboard/DashboardLayout";
+import { getConfig }             from "./services/configService";
+import DowntimeListManager from "./components/kpiEntry/DowntimeListManager";
+import BudgetsListManager from "./components/kpiEntry/BudgetsListManager";
+import DrxListManager from "./components/kpiEntry/DrxListManager";
+const App: React.FC = () => {
+  // grab your saved config once
+  const cfg = getConfig();
 
-import ChangeItemsFeasibilityExtra from "./pages/ChangeItemsFeasibilityExtra";
-import ChangeItemsImplementationExtra from "./pages/ChangeItemsImplementationExtra";
-import AddQuestionPage from "./pages/AddQuestionPage";
-import ScrapFollowingSection from "./pages/ScrapFollowingSection";
-import FollowCostKPIEditor from "./pages/FollowCostKPIEditor";
+  return (
+    <Routes>
+      {/* 1) Auth & Landing */}
+      <Route index element={<LoginPage />} />
+      <Route path="/tool-selection" element={<ToolSelectionPage />} />
+      <Route path="/data-extraction" element={<SharePointUploaderPage />} />
 
-import ToolSelectionPage from "./pages/ToolSelectionPage";
-import SharePointUploaderPage from "./pages/SharePointUploaderPage"; // assuming this exists
+      {/* 2) Configuration */}
+      <Route path="/config" element={<ConfigPage />} />
 
-import DRXKPIEditor from "./pages/DRXKPIEditor";
-import DowntimeKPIEditor from "./pages/DowntimeKPIEditor";
-import BudgetKPIEditor from "./pages/BudgetKPIEditor";
-import DashboardHome from "./pages/DashboardHome";
-import QuestionsListPage from "./pages/QuestionsListPage";
-import SendEmailPage     from "./pages/SendEmailPage";
-import ResponsePage from "./pages/ResponsePage";
-import Phase4KPIInput from "./components/kpiEntry/Phase4KPIInput";
-import DRXKPIInput from "./components/kpiEntry/DRXKPIInput";
-import DowntimeKPIInput from "./components/kpiEntry/DowntimeKPIInput";
-import FollowUpKPIInput from "./components/kpiEntry/FollowUpKPIInput";
-import BudgetKPIInput from "./components/kpiEntry/BudgetKPIInput";
+      {/* 3) Change‐management flow */}
+      <Route path="/project-selection" element={<ProjectSelection />} />
+      <Route path="/changes/:projectKey" element={<PhaseSelectionPage />} />
+      <Route path="/changes/:projectKey/implementation" element={<ChangeItemsImplementation />} />
+      <Route path="/details/:projectKey/implementation/:itemId" element={<DetailsImplementation />} />
+      <Route path="/changes/:projectKey/feasibility" element={<ChangeItemsFeasibility />} />
+      <Route path="/details/:projectKey/feasibility/:itemId" element={<DetailsFeasibility />} />
 
-const App: React.FC = () => (
-  <Routes>
-    {/* Auth & Landing */}
-    <Route index element={<LoginPage />} />
-    <Route path="/tool-selection" element={<ToolSelectionPage />} />
-    <Route path="/data-extraction" element={<SharePointUploaderPage />} />
-    {/* Configuration */}
-    <Route path="/config" element={<ConfigPage />} />
+      <Route path="/send-email/:projectKey/:phase/:itemId"      element={<QuestionsListPage />} />
+      <Route path="/send-email/:projectKey/:phase/:itemId/add-question" element={<AddQuestionPage />} />
+      <Route path="/send-email/:projectKey/:phase/:itemId/:questionId" element={<SendEmailPage />} />
+      <Route path="/response/:projectKey/:phase/:itemId/:questionId"   element={<ResponsePage />} />
 
-    {/* Change management flow */}
-    <Route path="/project-selection" element={<ProjectSelection />} />
-    <Route path="/changes/:projectKey" element={<PhaseSelectionPage />} />
-    <Route path="/changes/:projectKey/implementation" element={<ChangeItemsImplementation />} />
-    <Route path="/details/:projectKey/implementation/:itemId" element={<DetailsImplementation />} />
-    <Route path="/changes/:projectKey/feasibility" element={<ChangeItemsFeasibility />} />
-    <Route path="/details/:projectKey/feasibility/:itemId" element={<DetailsFeasibility />} />
+      {/* extra phases */}
+      <Route path="/changes/:projectKey/implementation-extra" element={<ChangeItemsImplementation />} />
+      <Route path="/changes/:projectKey/feasibility-extra"    element={<ChangeItemsFeasibility />} />
 
-    <Route path="/send-email/:projectKey/:phase/:itemId" element={<QuestionsListPage />} />
-    <Route path="/send-email/:projectKey/:phase/:itemId/add-question" element={<AddQuestionPage />}/>
-    <Route path="/send-email/:projectKey/:phase/:itemId/:questionId" element={<SendEmailPage />} />
-    <Route path="/response/:projectKey/:phase/:itemId/:questionId"element={<ResponsePage />}/>
-    {/* NEW routes for extra phases */}
-    <Route path="/changes/:projectKey/feasibility-extra" element={<ChangeItemsFeasibilityExtra />} />
-    <Route path="/changes/:projectKey/implementation-extra" element={<ChangeItemsImplementationExtra />} />
+      {/* 4) Dashboard section */}
+      <Route path="/dashboard/*" element={<DashboardLayout />}>
+        <Route index element={<DashboardHome />} />
+        <Route path=":project" element={<DashboardPage />} />
+      </Route>
 
-    {/* Dashboard section */}
-    <Route path="/dashboard/*" element={<DashboardLayout />}>  
-      <Route index element={<DashboardHome />} />
-      <Route path=":project" element={<DashboardPage />} />
-    </Route>
-    {/* …other routes */}
-    <Route path="/kpis" element={<KPIInputPage />}>
-  <Route index element={<Navigate to="drx" />} />   {/* ✅ FIXED */}
-  <Route path="drx" element={<DRXKPIInput />} />
-  <Route path="downtime" element={<DowntimeKPIInput />} />
-  <Route path="budget" element={<BudgetKPIInput />} />
-  <Route path="followup" element={<FollowUpKPIInput />} />
-  <Route path="scrap" element={<ScrapFollowingSection />} />
-  <Route path="phase4" element={<Phase4KPIInput />} />
-</Route>
+      {/* 5) KPI section */}
+      <Route path="/" element={<Navigate to="/kpis/downtime" replace />} />
+      <Route path="/kpis/*" element={<KPIInputPage />}>
+        {/* default to downtime */}
+        <Route index element={<Navigate to="downtime" replace />} />
 
-<Route path="/kpi-editor/drx" element={<DRXKPIEditor />} />
-<Route path="/kpi-editor/downtime" element={<DowntimeKPIEditor />} />
-<Route path="/kpi-editor/budget" element={<BudgetKPIEditor />} />
-<Route path="/follow-cost-editor" element={<FollowCostKPIEditor/>}/>
+        <Route path="scrap"         element={<ScrapFollowingSection />} />
+        <Route path="downtime" element={<DowntimeListManager />} />
+        <Route path="drx"      element={<DrxListManager />} />
+        <Route path="budgets"  element={<BudgetsListManager />} />
+        <Route
+          path="followcostkpi"
+          element={
+            <FollowUpExcelUploader
+              siteId={cfg.siteId}
+              listId={cfg.lists.find(l => l.name === "FollowCostKPI")?.listId || ""}
+              projects={cfg.projects}
+              onComplete={() => {/* maybe toast or reload */}}
+            />
+          }
+        />
+        <Route path="phase4targets" element={<Phase4KPIInput />} />
 
+        {/* any unknown → go back to downtime */}
+        <Route path="*" element={<Navigate to="downtime" replace />} />
+      </Route>
 
-    {/* 404 */}
-    <Route path="*" element={<NotFoundPage />} />
-  </Routes>
-);
+      {/* 6) Legacy editors / fallbacks */}
+      <Route path="/kpi-editor/drx"      element={<DRXKPIEditor />} />
+      <Route path="/kpi-editor/downtime" element={<DowntimeKPIEditor />} />
+      <Route path="/kpi-editor/budget"   element={<BudgetKPIEditor />} />
+      <Route path="/follow-cost-editor"  element={<FollowCostKPIEditor />} />
+
+      {/* 404 */}
+      <Route path="*" element={<NotFoundPage />} />
+    </Routes>
+  );
+};
 
 export default App;

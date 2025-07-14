@@ -4,14 +4,19 @@ import React from "react";
 import ReactECharts from "echarts-for-react";
 import { FilterMode, FollowCostItem } from "../../../pages/types";
 
-/** Parses "DD.MM.YYYY HH:mm:ss" or "DD.MM.YYYY" */
+/** Parse "DD.MM.YYYY HH:mm:ss" or "DD.MM.YYYY" */
 function parseEuropeanDate(dateStr: string): Date {
+  const d = new Date(dateStr);
+  if (!isNaN(d.getTime())) {
+    return d;
+  }
+
+  // 2) Fallback to European style "DD.MM.YYYY[ HH:mm:ss]"
   const [datePart, timePart = "00:00:00"] = dateStr.split(" ");
   const [day, month, year]               = datePart.split(".").map(Number);
   const [h, m, s]                        = timePart.split(":").map(Number);
   return new Date(year, month - 1, day, h, m, s);
 }
-
 interface Props {
   data: FollowCostItem[];
   filterMode: FilterMode;
@@ -133,10 +138,59 @@ export const FollowupCostByProjectReasonChart: React.FC<Props> = ({
       }
     };
   });
+const TITLE_MAP: Record<FilterMode, string> = {
+  year:        "Total Nett Value per Sub-Project",
+  quarter:     "Total Nett Value per Sub-Project",
+  month:       "Total Nett Value per Sub-Project",
+  day:         "Total Nett Value per Sub-Project",
+  weekOfMonth: "Total Nett Value per Sub-Project",
+  weekOfYear:  "Total Nett Value per Sub-Project",
+  customRange: "Total Nett Value per Sub-Project",
+};
+
+  // 3) Compute a subtitle suffix based on filterMode + selections
+  const mainTitle = TITLE_MAP[filterMode];
+
+// build a little “sub” string from your selected filters:
+let subTitle = "";
+switch (filterMode) {
+  case "year":
+    subTitle = `Year ${selectedYear}`;
+    break;
+  case "quarter":
+    subTitle = `Q${selectedQuarter} ${selectedYear}`;
+    break;
+  case "month":
+    subTitle = `${selectedMonth}/${selectedYear}`;
+    break;
+  case "day":
+    subTitle = `${selectedDay}/${selectedMonth}/${selectedYear}`;
+    break;
+  case "weekOfMonth":
+    subTitle = `W${selectedWeekOfMonth} of ${selectedMonth}/${selectedYear}`;
+    break;
+  // etc…
+  case "customRange":
+    subTitle = `From ${fromDay}/${fromMonth}/${fromYear} to ${toDay}/${toMonth}/${toYear}`;
+    break;
+}
+
+// now glue them together on one line:
+const fullTitle = subTitle
+  ? `${mainTitle} — ${subTitle}`
+  : mainTitle;
 
   // 6) The ECharts “option”:
   const option = {
     color:    palette,
+     title: [
+      {
+         text: fullTitle,
+        left: "center",
+        top: 16,
+        textStyle: { fontSize: 18 }
+      }
+    ],
     toolbox:  { show: true, feature: { saveAsImage: { title: "Save as Image" } } },
     legend:   {
       orient:    "horizontal",

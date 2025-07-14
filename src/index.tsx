@@ -8,7 +8,6 @@ import { MsalProvider } from "@azure/msal-react";
 import App from "./App";
 import { msalConfig } from "./authConfig";
 import "./index.css";
-
 // GA4 imports
 import { initGA } from "./analytics/ga4";
 import { RouterTracker } from "./analytics/RouterTracker";

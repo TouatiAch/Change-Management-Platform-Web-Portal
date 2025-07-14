@@ -9,14 +9,13 @@ import scrapIcon from "../assets/images/scrap.png";
 import targetIcon from "../assets/images/target.png";
 
 const tabs = [
-  { path: "/kpis/followup", label: " Cost PA ",        icon: followupIcon },
-  { path: "/kpis/scrap",      label: "Scrap",                 icon: scrapIcon    },
-  { path: "/kpis/drx",        label: "Engineering DRX Ideas", icon: drxIcon      },
-  { path: "/kpis/downtime",   label: "Downtime",              icon: downtimeIcon },
-  { path: "/kpis/budget",     label: "Budget",                icon: budgetIcon   },
-  { path: "/kpis/phase4",     label: "Phase 4 Closure",       icon: targetIcon   },
+  { path: "/kpis/scrap",         label: "Scrap",        icon: scrapIcon    },
+  { path: "/kpis/downtime",      label: "Downtime",     icon: downtimeIcon },
+  { path: "/kpis/drx",           label: "DRX Ideas",    icon: drxIcon      },
+  { path: "/kpis/budgets",       label: "Budgets",      icon: budgetIcon   },
+  { path: "/kpis/followcostkpi", label: "Cost PA",      icon: followupIcon },
+  { path: "/kpis/phase4targets", label: "Phase 4",      icon: targetIcon   },
 ];
-
 const SidebarMenu: React.FC = () => {
   const location = useLocation();
 
