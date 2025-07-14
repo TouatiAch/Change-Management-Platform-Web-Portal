@@ -382,7 +382,6 @@ console.log(
                 <tr>
                   <th><input type="checkbox" checked={allSel} onChange={(e) => toggleAll(e.target.checked)} /></th>
                   <th>Panier ID</th>
-                  <th>Zone</th>
                   <th>Carline</th>
                   <th>Topic</th>
                   <th>Projet</th>

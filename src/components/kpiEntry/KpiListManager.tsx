@@ -4,7 +4,6 @@ import axios from "axios";
 import type { ListConfig, IProject } from "../../services/configService";
 import ProjectCarousel from "../ProjectCarousel";
 
-// newRow has no id; ItemRow always has id:string
 type NewRow = Record<string, string | number>;
 type ItemRow = { id: string } & Record<string, any>;
 
@@ -45,7 +44,24 @@ export default function KpiListManager({
   const [newRow, setNewRow] = useState<NewRow>({ ...emptyRow });
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
 
-  // ── Fetch Items ───────────────────────────────────────────────────
+
+  const isFormValid = useMemo(() => {
+  // if your list has projects, require one
+  if (listConfig.hasProject && !newRow.Project) return false;
+
+  // check numeric fields
+  for (const f of listConfig.fields) {
+    if (f.name === "rateofdowntime") continue;
+    const v = newRow[f.name];
+    if (f.type === "Number" && v !== "" && isNaN(Number(String(v).replace(",", ".")))) {
+      return false;
+    }
+  }
+  return true;
+}, [newRow, listConfig]);
+
+
+// ── Fetch Items ───────────────────────────────────────────────────
   const fetchItems = async () => {
     setLoading(true);
     setError(null);
@@ -111,18 +127,25 @@ export default function KpiListManager({
 
   // ── Validation ────────────────────────────────────────────────────
   const validateNewRow = () => {
-    const errs: Record<string, string> = {};
-    listConfig.fields.forEach((f) => {
-      if (f.name === "rateofdowntime") return;
-      const v = newRow[f.name];
-      if (f.type === "Number" && v !== "" && isNaN(Number(String(v).replace(",", ".")))) {
-        errs[f.name] = `${f.name} must be a number`;
-      }
-    });
-    setValidationErrors(errs);
-    return Object.keys(errs).length === 0;
-  };
+  const errs: Record<string, string> = {};
 
+  // 1️⃣ If this list uses projects, make sure one is chosen
+  if (listConfig.hasProject && !newRow.Project) {
+    errs.Project = "Please select a project.";
+  }
+
+  // 2️⃣ Existing numeric‐type checks
+  listConfig.fields.forEach((f) => {
+    if (f.name === "rateofdowntime") return;
+    const v = newRow[f.name];
+    if (f.type === "Number" && v !== "" && isNaN(Number(String(v).replace(",", ".")))) {
+      errs[f.name] = `${f.label ?? f.name} must be a number`;
+    }
+  });
+
+  setValidationErrors(errs);
+  return Object.keys(errs).length === 0;
+};
   // ── CRUD ───────────────────────────────────────────────────────────
 
   const createItem = async () => {
@@ -268,6 +291,7 @@ export default function KpiListManager({
 
         <button
           onClick={createItem}
+          disabled={!isFormValid}
           className="mt-4 px-6 py-3 bg-blue-600 text-white rounded hover:bg-blue-700"
         >
           Save

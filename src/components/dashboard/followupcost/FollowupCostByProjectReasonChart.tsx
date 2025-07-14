@@ -146,6 +146,7 @@ const TITLE_MAP: Record<FilterMode, string> = {
   weekOfMonth: "Total Nett Value per Sub-Project",
   weekOfYear:  "Total Nett Value per Sub-Project",
   customRange: "Total Nett Value per Sub-Project",
+  semester:    "Total Nett Value per Sub-Project",
 };
 
   // 3) Compute a subtitle suffix based on filterMode + selections

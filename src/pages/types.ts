@@ -154,6 +154,7 @@ export type FilterMode =
   | "quarter"
   | "month"
   | "day"
+  | "semester"
   | "weekOfMonth"
   | "weekOfYear"
   | "customRange";

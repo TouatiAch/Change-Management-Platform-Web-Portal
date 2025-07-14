@@ -100,6 +100,7 @@ export async function lookupSiteAndLists(
     { name: "BucketID", type: "Text" ,label: "BucketID"},
     { name: "Date", type: "Text" ,label: "Date" },
     { name: "Statut", type: "Text" ,label:"Statut" },
+    { name: "Monthlytarget", type: "Number" ,label:"Monthly Target" },
     { name: "Quantity", type: "Number" ,label:"Quantity"},
     { name: "NettValue", type: "Number" ,label:"Nett Value" },
     { name: "TotalNettValue", type: "Number" ,label:"Total Nett Value" },

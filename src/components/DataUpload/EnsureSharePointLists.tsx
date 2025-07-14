@@ -88,6 +88,7 @@ const REQUIRED_LISTS: Array<{ name: string; fields: FieldDef[] }> = [
       { name: "InitiationReasons",  type: "Text"   },
       { name: "BucketID",           type: "Text"   },
       { name: "Date",               type: "Text"   },
+      { name: "Monthlytarget",      type: "Number" },
       { name: "Statut",             type: "Text"   },
       { name: "Quantity",           type: "Number" },
       { name: "NettValue",          type: "Number" },

@@ -30,6 +30,8 @@ import { FollowupCostProjectTimeSeriesChart } from "./followupcost/FollowupCostP
 import type { ListConfig } from "../../services/configService";
 import DRXEntriesChart from "./drx/DRXEntriesChart";
 import BudgetEntriesChart from "./budget/BudgetEntriesChart";
+import { ProjectCostWithTargetChart } from "./followupcost/ProjectCostWithTargetChart";
+import { MonthlyTargetTable } from "./followupcost/MonthlyTargetTable";
 const apiTabs = [
   { key: "changes", label: "Changes", icon: changesIcon },
   { key: "unplannedDowntime", label: "Unplanned Downtime", icon: downtimeIcon },
@@ -121,6 +123,7 @@ type FilterMode =
   | "quarter"
   | "month"
   | "day"
+  | "semester"
   | "weekOfMonth"
   | "weekOfYear"
   | "customRange";
@@ -156,7 +159,41 @@ const config = getConfig();
   const [selectedMonth, setSelectedMonth] = useState(defaultMonth);
   const [selectedDay, setSelectedDay] = useState(defaultDay);
   const [selectedQuarter, setSelectedQuarter] = useState("1");
+const [selectedSemester, setSelectedSemester] = useState<1|2>(1);
+const ALL_PROJECTS = config.projects
+  .map(p => p.displayName)
+  .concat("draxlameir");
+const [monthlyTargets, setMonthlyTargets] = useState<Record<string, number[]>>(
+  () => Object.fromEntries(
+    ALL_PROJECTS.map(p => [p, Array(12).fill(0)])
+  )
+);
+const perBucketTarget: Record<string, number> = {};
 
+ALL_PROJECTS.forEach((proj) => {
+  const arr = monthlyTargets[proj] || Array(12).fill(0);
+  let val: number;
+  switch (filterMode) {
+    case "month":
+      val = arr[Number(selectedMonth) - 1];
+      break;
+    case "quarter": {
+      const q = Number(selectedQuarter);
+      const start = (q - 1) * 3;
+      val = arr.slice(start, start + 3).reduce((a, b) => a + b, 0);
+      break;
+    }
+    case "semester": {
+      const start = (selectedSemester - 1) * 6;
+      val = arr.slice(start, start + 6).reduce((a, b) => a + b, 0);
+      break;
+    }
+    case "year":
+    default:
+      val = arr.reduce((a, b) => a + b, 0);
+  }
+  perBucketTarget[proj] = val;
+});
   // State for week-of-month/week-of-year
   const [selectedWeekOfMonth, setSelectedWeekOfMonth] = useState<number | null>(null);
   const [selectedWeekOfYear, setSelectedWeekOfYear] = useState<number | null>(null);
@@ -639,6 +676,47 @@ const config = getConfig();
           {/* --- COST PA --- */}
           {selectedApi === "costPA" && (
             <>
+             {/* ── TARGET INPUT TABLE ───────────────────── */}
+    <div className="bg-white rounded-lg shadow-md p-6 col-span-2">
+      <h2 className="text-xl font-semibold mb-2">
+        Set Monthly Targets per Project
+      </h2>
+      <MonthlyTargetTable
+        projects={ALL_PROJECTS}
+        initialTargets={monthlyTargets}
+        onChange={(newMap: Record<string, number[]>) =>
+          setMonthlyTargets(newMap)
+        }
+      />
+      {/* Semester picker (only shown when filterMode="semester") */}
+      {filterMode === "semester" && (
+        <div className="mt-2">
+          <label className="mr-2">Semester:</label>
+          <select
+            value={String(selectedSemester)}
+            onChange={e =>
+              setSelectedSemester(Number(e.target.value) as 1|2)
+            }
+            className="border px-2 py-1 rounded"
+          >
+            <option value="1">H1 (Jan–Jun)</option>
+            <option value="2">H2 (Jul–Dec)</option>
+          </select>
+        </div>
+      )}
+    </div>
+
+    {/* ── CUMULATIVE ACTUAL vs TARGET ───────────── */}
+    <div className="bg-white rounded-lg shadow-md p-6 col-span-2">
+      <h2 className="text-xl font-semibold mb-2">
+        Cumulative Actual vs. Target
+      </h2>
+      <ProjectCostWithTargetChart
+        data={followCostItems}
+        year={Number(selectedYear)}
+        monthlyTarget={perBucketTarget}
+      />
+    </div>
               {/* —————————————————————————————— */}
 {/* For *single* projects: time-series */}
 <div className="bg-white rounded-lg shadow-md p-6 col-span-2">
