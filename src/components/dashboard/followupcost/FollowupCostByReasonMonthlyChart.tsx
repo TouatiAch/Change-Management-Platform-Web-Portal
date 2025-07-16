@@ -129,24 +129,28 @@ export const FollowupCostByReasonMonthlyChart: React.FC<Props> = ({
       });
 
       return {
-        name:      reason,
-        type:      "bar",
-        barWidth:  20,
-        data:      dataByMonth,
-        itemStyle: { color },
-        label: {
-          show:     true,           // always show
-          position: "top",
-          distance: 6,              // lift above bar
-          formatter: (p: any) => `€${p.value.toLocaleString()}`,
-          fontSize: 12,
-          color:    "#000"
-        },
-        labelLayout: {
-          // let them overlap if necessary
-          hideOverlap: false
-        }
-      };
+  name:      reason,
+  type:      "bar",
+  barWidth:  20,
+  data:      dataByMonth,
+  itemStyle: { color },
+  label: {
+    show:           true,
+    position:       "top",
+    distance:       6,
+    formatter:      (p: any) => `€${p.value.toLocaleString()}`,
+    fontSize:       12,
+    color:          "#fff",
+    backgroundColor: color,         // or use the callback above
+    padding:        [2, 6],
+    borderRadius:   4,
+    fontWeight:     "bold"
+  },
+  labelLayout: {
+    hideOverlap: false
+  }
+};
+
     });
   }, [raw, months, reasons]);
 
