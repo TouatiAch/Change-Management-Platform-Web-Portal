@@ -154,30 +154,38 @@ const DraxlOverview: React.FC<Props> = ({ items }) => {
 
       {/* ── CHANGES PER SUB-PROJECT PIE ── */}
       <div className="bg-white rounded-lg shadow-md p-6">
-        <h3 className="text-lg font-semibold mb-4">Changes by Sub-Project</h3>
-        <ReactECharts
-          option={{
-            tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
-            legend:  { orient: 'vertical', left: 'left', data: projectList },
-            series: [
-              {
-                name: 'Changes',
-                type: 'pie',
-                radius: '50%',
-                data: projectData,
-                emphasis: {
-                  itemStyle: {
-                    shadowBlur: 10,
-                    shadowOffsetX: 0,
-                    shadowColor: 'rgba(0,0,0,0.5)'
-                  }
-                }
-              }
-            ]
-          }}
-          style={{ height: 300, width: '100%' }}
-        />
-      </div>
+  <h3 className="text-lg font-semibold mb-4">Changes by Sub-Project</h3>
+  <ReactECharts
+    option={{
+      tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
+      legend:  { orient: 'vertical', left: 'left', data: projectList },
+      series: [
+        {
+          name: 'Changes',
+          type: 'pie',
+          radius: '50%',
+          data: projectData,
+          // <— add this block:
+          label: {
+            show: true,
+            position: 'outside',
+            formatter: '{b}: {c} ({d}%)',
+            fontSize: 12,
+          },
+          emphasis: {
+            itemStyle: {
+              shadowBlur: 10,
+              shadowOffsetX: 0,
+              shadowColor: 'rgba(0,0,0,0.5)'
+            }
+          }
+        }
+      ]
+    }}
+    style={{ height: 300, width: '100%' }}
+  />
+</div>
+
 
       {/* ── SMALL MULTIPLES ── */}
       <DraxlameirSmallMultiples items={filteredLocalItems} />

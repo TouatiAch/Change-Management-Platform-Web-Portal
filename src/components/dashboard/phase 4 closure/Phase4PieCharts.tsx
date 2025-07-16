@@ -120,44 +120,52 @@ const Phase4PieCharts: React.FC<Props> = ({
 
   // Common ECharts option generator
   const makeOption = (dept: string, data: { name: string; value: number }[]) => ({
-    title: {
-      text: dept,
-      left: "center",
-      top: 8,
-      textStyle: { fontSize: 14 }
-    },
-    tooltip: {
-      trigger: "item",
-      formatter: "{b}: {c} ({d}%)"
-    },
-    toolbox: {
-   show: true,
-   feature: {
-     // this is the “download as image” icon
-     saveAsImage: {
-       show: true,
-       title: "Download as Image",
-       icon: 'path://M512 0C229.2 0 0 229.2 0 512s229.2 512 512 512 512-229.2 512-512S794.8 0 512 0zM512 960C264.6 960 64 759.4 64 512S264.6 64 512 64s448 200.6 448 448-200.6 448-448 448zM640 400H544V160H480v240H384l192 192L640 400z'
-     }
-   }
- },
-    legend: {
-      bottom: 0,
-      data: data.map((d) => d.name)
-    },
-    series: [
-      {
-        type: "pie",
-        radius: ["40%", "60%"],
-        center: ["50%", "50%"],
-        label: {
-          formatter: "{d}%\n{b}",
-          fontSize: 12
-        },
-        data
+  title: {
+    text: dept,
+    left: "center",
+    top: 8,
+    textStyle: { fontSize: 14 }
+  },
+  tooltip: {
+    trigger: "item",
+    // we'll keep the tooltip as-is
+    formatter: "{b}: {c} ({d}%)"
+  },
+  // Top‐level color array; applies in order to data[]
+  color: [
+    "#28a745", // green for Under/On Target
+    "#fd7e14", // orange for Over Target
+    "#ffc107"  // yellow for Open
+  ],
+  toolbox: {
+    show: true,
+    feature: {
+      saveAsImage: {
+        show: true,
+        title: "Download as Image",
+        icon: 'path://M512 0C229.2 0 0 229.2 0 512s229.2 512 512 512 512-229.2 512-512S794.8 0 512 0zM512 960C264.6 960 64 759.4 64 512S264.6 64 512 64s448 200.6 448 448-200.6 448-448 448zM640 400H544V160H480v240H384l192 192L640 400z'
       }
-    ]
-  });
+    }
+  },
+  legend: {
+    bottom: 0,
+    data: data.map(d => d.name)
+  },
+  series: [
+    {
+      type: "pie",
+      radius: ["40%", "60%"],
+      center: ["50%", "50%"],
+      // Label now shows: <name>: <count> (<percent>%)
+      label: {
+        formatter: "{b}: {c} ({d}%)",
+        fontSize: 12
+      },
+      data
+    }
+  ]
+});
+
 
   return (
    <div className="grid grid-cols-1 gap-4 mb-8">

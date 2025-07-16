@@ -114,7 +114,12 @@ export async function lookupSiteAndLists(
     { name: "Department", type: "Text" ,label:"Department" },
     { name: "Target", type: "Number",label:"Target" },
   ];
-
+const monthlyTargetFields: FieldDef[] = [
+  { name: "Project",       type: "Text",   label: "Project"         },
+  { name: "Year",          type: "Number", label: "Year"            },
+  { name: "Month",         type: "Number", label: "Month (1–12)"    },
+  { name: "MonthlyTarget", type: "Number", label: "Monthly Target (€)" },
+];
   // 5️⃣ Uniqueness rules per list
   const uniqueKeysMap: Record<string, string[]> = {
     downtime: ["Project", "year", "Month"],
@@ -122,6 +127,7 @@ export async function lookupSiteAndLists(
     Budgets: ["year", "Month", "Quarter"],
     FollowCostKPI: ["BucketID"],
     Phase4Targets: ["Project", "Department"],
+    MonthlyTargets: ["Project", "Year",   "Month"],
   };
 
   // 6️⃣ Upsert each KPI list into config.lists
@@ -137,6 +143,7 @@ export async function lookupSiteAndLists(
     { name: "Budgets",        partial: "budget",   fields: budgetsFields,  hasProject: false, useExcelUploader: false },
     { name: "FollowCostKPI",  partial: "follow",   fields: followFields,   hasProject: true,  useExcelUploader: true  },
     { name: "Phase4Targets",  partial: "target",   fields: phase4Fields,   hasProject: true,  useExcelUploader: false },
+    { name: "MonthlyTargets", partial: "monthtarget", fields: monthlyTargetFields, hasProject: true, useExcelUploader: false},
   ];
 
   for (const def of dynamicLists) {

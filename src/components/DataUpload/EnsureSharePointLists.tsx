@@ -107,6 +107,16 @@ const REQUIRED_LISTS: Array<{ name: string; fields: FieldDef[] }> = [
       { name: "Target",     type: "Number" },
     ],
   },
+  {
+  name: "MonthlyTargets", 
+  fields: [
+    { name: "Project",  type: "Text" },
+    { name: "Year",     type: "Number" },
+    { name: "Month",    type: "Number" },
+    { name: "Monthlytarget", type: "Number" },
+  ]
+},
+
 ];
 
 const UNIQUE_KEYS: Record<string, string[]> = {
@@ -117,6 +127,7 @@ const UNIQUE_KEYS: Record<string, string[]> = {
   Budgets:           ["year","Month","Quarter"],
   FollowCostKPI:     ["BucketID"],
   Phase4Targets:     ["Project","Department"],
+MonthlyTargets: ["Project","Year","Month"]
 };
 
 const EnsureSharePointLists: React.FC<Props> = ({ siteId, onLog }) => {

@@ -1,94 +1,120 @@
-// src/components/followupcost/ProjectCostWithTargetChart.tsx
+// src/components/dashboard/followupcost/ProjectCostWithTargetChart.tsx
 
 import React from "react";
 import ReactECharts from "echarts-for-react";
-import { FollowCostItem } from "../../../pages/types";
+import { FollowCostItem, FilterMode } from "../../../pages/types";
 
-/** Parse “DD.MM.YYYY HH:mm:ss” or “DD.MM.YYYY” */
-function parseEuropeanDate(dateStr: string): Date {
-  const d = new Date(dateStr);
+/** parse ISO or European “DD.MM.YYYY” */
+function parseDate(s: string): Date {
+  const d = new Date(s);
   if (!isNaN(d.getTime())) return d;
-
-  const [datePart, timePart = "00:00:00"] = dateStr.split(" ");
-  const [day, month, year]               = datePart.split(".").map(Number);
-  const [h, m, s]                        = timePart.split(":").map(Number);
-  return new Date(year, month - 1, day, h, m, s);
+  const [date] = s.split(" ");
+  const [day, mo, yr] = date.split(".").map(Number);
+  return new Date(yr, mo - 1, day);
 }
 
 interface Props {
   data: FollowCostItem[];
-  /** per‐project flat monthly target, e.g. { "ProjA": 9000, "ProjB": 5000 } */
-  monthlyTarget: Record<string, number>;
-  /** Restrict to a specific year (optional) */
+  /** Map: project → { "YYYY-MM" | "YYYY-Qn" | "YYYY-Sn" | "YYYY": target } */
+  monthlyTargets: Record<string, Record<string, number>>;
+  /** year to show (defaults to current) */
   year?: number;
+  /** grouping mode; "month" | "quarter" | "semester" | "year" */
+  filterMode: FilterMode;
+  /** list of all project IDs, including "draxlameir" for roll-up */
+  projects: string[];
 }
 
 export const ProjectCostWithTargetChart: React.FC<Props> = ({
   data,
-  monthlyTarget,
+  monthlyTargets,
   year = new Date().getFullYear(),
+  filterMode,
+  projects,
 }) => {
-  // 1) Buckets: project → monthKey (YYYY-MM) → sum of values
+  // 1) Sum up actuals per project + periodKey
   const actuals: Record<string, Record<string, number>> = {};
   data.forEach(item => {
     if (!item.Date) return;
-    const dt = parseEuropeanDate(item.Date);
-    if (dt.getFullYear() !== year) return;
+    const d = parseDate(item.Date);
+    if (d.getFullYear() !== year) return;
+    const proj = item.Project || "–";
 
-    const project = item.Project || "–";
-    const monthKey = dt.toISOString().slice(0, 7);
+    // compute period key based on filterMode
+    let key: string;
+    const m = d.getMonth() + 1;
+    if (filterMode === "month") {
+      key = `${year}-${String(m).padStart(2, "0")}`;           // "2025-06"
+    } else if (filterMode === "quarter") {
+      const q = Math.floor((m - 1) / 3) + 1;
+      key = `${year}-Q${q}`;                                    // "2025-Q2"
+    } else if (filterMode === "semester") {
+      const s = Math.floor((m - 1) / 6) + 1;
+      key = `${year}-S${s}`;                                    // "2025-S1"
+    } else { // "year"
+      key = String(year);
+    }
 
-    actuals[project] = actuals[project] || {};
-    actuals[project][monthKey] = (actuals[project][monthKey] || 0) + item.TotalNettValue;
+    actuals[proj] = actuals[proj] || {};
+    actuals[proj][key] = (actuals[proj][key] || 0) + item.TotalNettValue;
   });
 
-  // 2) Build sorted list of months present (or all 12 months if you prefer)
-  const monthSet = new Set<string>();
-  Object.values(actuals).forEach(projMap =>
-    Object.keys(projMap).forEach(m => monthSet.add(m))
-  );
-  const months = Array.from(monthSet).sort();
+  // 2) Collect all period keys from both actuals and targets
+  const keySet = new Set<string>();
+  Object.values(actuals).forEach(map => Object.keys(map).forEach(k => keySet.add(k)));
+  Object.values(monthlyTargets).forEach(map => Object.keys(map).forEach(k => keySet.add(k)));
 
-  // 3) For each project, build an actual‐cumulative array and a target‐cumulative array
-  const series: any[] = [];
-  Object.keys(actuals).forEach(project => {
-    const monthValues = months.map(m => actuals[project][m] || 0);
-
-    // cumulative actual
-    const cumActual = monthValues.reduce<number[]>((acc, v, i) => {
-      acc.push((acc[i - 1] || 0) + v);
-      return acc;
-    }, []);
-
-    // cumulative target
-    const targetPerMonth = monthlyTarget[project] || 0;
-    const cumTarget = months.map((_, i) => targetPerMonth * (i + 1));
-
-    // push bar series for actuals
-    series.push({
-      name: `${project} (Actual)`,
-      type: "bar",
-      data: cumActual,
-      stack: project,            // stack per project so bars don’t overlap
-      barMaxWidth: 30,
-      label: {
-        show: true,
-        position: "top",
-        formatter: (p: any) => `€${p.value.toLocaleString()}`,
-        backgroundColor: "auto",
-        padding: [4, 8],
-        borderRadius: 4,
-        color: "#fff",
-        fontSize: 12,
-        offset: [0, -6],
-      },
+  // Only keep this year's keys, then sort appropriately
+  const keys = Array.from(keySet)
+    .filter(k => k.startsWith(String(year)))
+    .sort((a, b) => {
+      if (filterMode === "month") {
+        return a.localeCompare(b);
+      }
+      if (filterMode === "year") {
+        return 0; // single key, ordering irrelevant
+      }
+      // for Q/S: compare numeric suffix
+      const na = Number(a.split(/[-QS]/)[1]);
+      const nb = Number(b.split(/[-QS]/)[1]);
+      return na - nb;
     });
 
-    // push line series for target
+  // 3) Build a series per project
+  const series: any[] = [];
+
+  projects.forEach(proj => {
+    // skip if neither actuals nor targets exist
+    if (!actuals[proj] && !monthlyTargets[proj]) return;
+
+    // cumulative actual
+    let cumA = 0;
+    const dataA = keys.map(k => {
+      cumA += actuals[proj]?.[k] || 0;
+      return cumA;
+    });
+
+    // cumulative target
+    let cumT = 0;
+    const dataT = keys.map(k => {
+      cumT += monthlyTargets[proj]?.[k] || 0;
+      return cumT;
+    });
+
+    // bar for actual
     series.push({
-      name: `${project} (Target)`,
+      name: `${proj} Actual`,
+      type: "bar",
+      data: dataA,
+      stack: proj,
+      label: { show: true, position: "top", formatter: `€{c}` },
+    });
+
+    // line for target
+    series.push({
+      name: `${proj} Target`,
       type: "line",
-      data: cumTarget,
+      data: dataT,
       smooth: true,
       symbol: "circle",
       symbolSize: 6,
@@ -98,44 +124,19 @@ export const ProjectCostWithTargetChart: React.FC<Props> = ({
   });
 
   const option = {
-    color: ["#5470C6", "#91CC75", "#FAC858", "#EE6666", "#73C0DE"],
-
     tooltip: { trigger: "axis" },
-
-    legend: {
-      type: "scroll",
-      orient: "horizontal",
-      top: 10,
-    },
-
-    toolbox: {
-      show: true,
-      feature: { saveAsImage: { title: "Save as Image" } },
-    },
-
+    legend: { type: "scroll", data: series.map(s => s.name) },
+    toolbox: { feature: { saveAsImage: {} } },
     xAxis: {
       type: "category",
-      data: months,
-      axisLabel: { rotate: 0, fontSize: 14 },
-      axisTick: { alignWithLabel: true },
+      data: keys,
+      axisLabel: {
+        formatter: (val: string) => val
+      }
     },
-
-    yAxis: {
-      type: "value",
-      name: "€",
-      nameTextStyle: { fontSize: 16 },
-      axisLabel: { fontSize: 14 },
-    },
-
+    yAxis: { type: "value", name: "€" },
     series,
   };
 
-  return (
-    <ReactECharts
-      option={option}
-      style={{ height: 450, width: "100%" }}
-      notMerge={true}
-      lazyUpdate={true}
-    />
-  );
+  return <ReactECharts option={option} style={{ height: 450 }} />;
 };

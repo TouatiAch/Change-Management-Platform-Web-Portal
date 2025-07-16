@@ -1,105 +1,74 @@
-// src/components/followupcost/MonthlyTargetTable.tsx
-import React, { useState, useEffect } from "react";
+// src/components/dashboard/followupcost/MonthlyTargetTable.tsx
+
+import React from "react";
 
 const MONTHS = [
-  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+  "Jan","Feb","Mar","Apr","May","Jun",
+  "Jul","Aug","Sep","Oct","Nov","Dec"
 ];
 
 interface Props {
-  /** List of all project names, *including* the special "draxlameir" string */
+  /** List of all project IDs, including "draxlameir" as the roll-up row */
   projects: string[];
-  /** Initial targets by project name → 12-entry array; defaults to all zeros */
-  initialTargets?: Record<string, number[]>;
-  /**
-   * Callback whenever targets change:
-   *   targets[project][0] = Jan, [1] = Feb, …, [11] = Dec
-   */
-  onChange?: (targets: Record<string, number[]>) => void;
+  /** String values shown in each input cell for each project/month */
+  rawInputs: Record<string, string[]>;
+  /** Parsed numeric values for each project/month */
+  numericTargets: Record<string, number[]>;
+  /** Called on <input>.onChange */
+  onRawChange: (project: string, monthIdx: number, value: string) => void;
+  /** Called on <input>.onBlur */
+  onCellBlur: (project: string, monthIdx: number) => void;
 }
 
 export const MonthlyTargetTable: React.FC<Props> = ({
   projects,
-  initialTargets = {},
-  onChange,
+  rawInputs,
+  numericTargets,
+  onRawChange,
+  onCellBlur,
 }) => {
-  // Separate out draxlameir from the rest
   const DRAXL = "draxlameir";
-  const otherProjects = projects.filter(p => p !== DRAXL);
 
-  // State only for the “other” projects; drax will be derived
-  const [targets, setTargets] = useState<Record<string, number[]>>(() => {
-    const t: Record<string, number[]> = {};
-    otherProjects.forEach(p => {
-      t[p] = initialTargets[p]?.slice(0, 12) ?? Array(12).fill(0);
-    });
-    return t;
-  });
+  // All projects except the special aggregate
+  const others = projects.filter(p => p !== DRAXL);
 
-  // Compute draxlameir row as sum of others
-  const draxlTargets = MONTHS.map((_, monthIdx) =>
-    otherProjects.reduce((sum, p) => sum + (targets[p][monthIdx] || 0), 0)
+  // Compute the aggregate row by summing numericTargets across all other projects
+  const draxlSum = MONTHS.map((_, mi) =>
+    others.reduce((acc, proj) => acc + (numericTargets[proj]?.[mi] || 0), 0)
   );
 
-  // Whenever targets change (including draxl), notify parent
-  useEffect(() => {
-    if (!onChange) return;
-    onChange({
-      ...targets,
-      [DRAXL]: draxlTargets,
-    });
-  }, [targets, draxlTargets.join(","), onChange]);
-
-  const handleInputChange = (
-    project: string,
-    monthIdx: number,
-    raw: string
-  ) => {
-    const val = parseInt(raw, 10) || 0;
-    setTargets(prev => ({
-      ...prev,
-      [project]: prev[project].map((old, i) =>
-        i === monthIdx ? val : old
-      ),
-    }));
-  };
-
   return (
-    <table style={{ borderCollapse: "collapse", width: "100%" }}>
+    <table style={{ width: "100%", borderCollapse: "collapse" }}>
       <thead>
         <tr>
-          <th style={thStyle}>Project</th>
+          <th style={th}>Project</th>
           {MONTHS.map(m => (
-            <th key={m} style={thStyle}>{m}</th>
+            <th key={m} style={th}>{m}</th>
           ))}
         </tr>
       </thead>
       <tbody>
-        {otherProjects.map(project => (
-          <tr key={project}>
-            <td style={tdStyle}>{project}</td>
-            {Array.from({ length: 12 }).map((_, mi) => (
-              <td key={mi} style={tdStyle}>
+        {others.map(proj => (
+          <tr key={proj}>
+            <td style={td}>{proj}</td>
+            {MONTHS.map((_, mi) => (
+              <td key={mi} style={td}>
                 <input
-                  type="number"
-                  min={0}
-                  value={targets[project][mi]}
-                  onChange={e =>
-                    handleInputChange(project, mi, e.target.value)
-                  }
-                  style={inputStyle}
+                  type="text"
+                  style={input}
+                  value={rawInputs[proj]?.[mi] ?? ""}
+                  onChange={e => onRawChange(proj, mi, e.target.value)}
+                  onBlur={() => onCellBlur(proj, mi)}
                 />
               </td>
             ))}
           </tr>
         ))}
-        {/* draxlameir row */}
-        <tr style={{ fontWeight: "bold", background: "#f9f9f9" }}>
-          <td style={tdStyle}>{DRAXL}</td>
-          {draxlTargets.map((v, mi) => (
-            <td key={mi} style={tdStyle}>
-              {v.toLocaleString()}
-            </td>
+
+        <tr style={{ fontWeight: "bold", background: "#fafafa" }}>
+          <td style={td}>{DRAXL}</td>
+          {draxlSum.map((sum, mi) => (
+            <td key={mi} style={td}>{sum.toLocaleString()}</td>
           ))}
         </tr>
       </tbody>
@@ -107,19 +76,21 @@ export const MonthlyTargetTable: React.FC<Props> = ({
   );
 };
 
-// --- simple inline styles for clarity; adjust or replace with CSS as you like ---
-const thStyle: React.CSSProperties = {
-  border: "1px solid #ccc",
-  padding: "8px",
-  textAlign: "center",
-  background: "#eee",
-};
-const tdStyle: React.CSSProperties = {
-  border: "1px solid #ccc",
-  padding: "6px",
+const th: React.CSSProperties = {
+  border: "1px solid #ddd",
+  padding: 8,
+  background: "#f0f0f0",
   textAlign: "center",
 };
-const inputStyle: React.CSSProperties = {
-  width: "80px",
+
+const td: React.CSSProperties = {
+  border: "1px solid #ddd",
+  padding: 6,
+  textAlign: "center",
+};
+
+const input: React.CSSProperties = {
+  width: "100%",
+  boxSizing: "border-box",
   textAlign: "right",
 };

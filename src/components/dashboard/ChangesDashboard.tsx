@@ -31,7 +31,11 @@ import type { ListConfig } from "../../services/configService";
 import DRXEntriesChart from "./drx/DRXEntriesChart";
 import BudgetEntriesChart from "./budget/BudgetEntriesChart";
 import { ProjectCostWithTargetChart } from "./followupcost/ProjectCostWithTargetChart";
-import { MonthlyTargetTable } from "./followupcost/MonthlyTargetTable";
+import { FollowupCostMonthlyChart } from "./followupcost/FollowupCostMonthlyChart";
+import { FollowupCostByReasonMonthlyChart } from "./followupcost/FollowupCostByReasonMonthlyChart";
+import { MonthlyTargetTableContainer } from "./followupcost/MonthlyTargetTableContainer";
+import { ProjectCostChart } from "./followupcost/ProjectCostChart";
+import { CombinedTargetChart } from "./followupcost/CombinedTargetChart";
 const apiTabs = [
   { key: "changes", label: "Changes", icon: changesIcon },
   { key: "unplannedDowntime", label: "Unplanned Downtime", icon: downtimeIcon },
@@ -160,40 +164,40 @@ const config = getConfig();
   const [selectedDay, setSelectedDay] = useState(defaultDay);
   const [selectedQuarter, setSelectedQuarter] = useState("1");
 const [selectedSemester, setSelectedSemester] = useState<1|2>(1);
+
+
+
 const ALL_PROJECTS = config.projects
   .map(p => p.displayName)
   .concat("draxlameir");
-const [monthlyTargets, setMonthlyTargets] = useState<Record<string, number[]>>(
-  () => Object.fromEntries(
-    ALL_PROJECTS.map(p => [p, Array(12).fill(0)])
-  )
-);
-const perBucketTarget: Record<string, number> = {};
 
-ALL_PROJECTS.forEach((proj) => {
-  const arr = monthlyTargets[proj] || Array(12).fill(0);
-  let val: number;
-  switch (filterMode) {
-    case "month":
-      val = arr[Number(selectedMonth) - 1];
-      break;
-    case "quarter": {
-      const q = Number(selectedQuarter);
-      const start = (q - 1) * 3;
-      val = arr.slice(start, start + 3).reduce((a, b) => a + b, 0);
-      break;
-    }
-    case "semester": {
-      const start = (selectedSemester - 1) * 6;
-      val = arr.slice(start, start + 6).reduce((a, b) => a + b, 0);
-      break;
-    }
-    case "year":
-    default:
-      val = arr.reduce((a, b) => a + b, 0);
-  }
-  perBucketTarget[proj] = val;
-});
+// at the top of your component, after defining ALL_PROJECTS
+const initialRawInputs = Object.fromEntries(
+  ALL_PROJECTS.map(p => [p, Array(12).fill("0")])
+);
+const initialNumericTargets = Object.fromEntries(
+  ALL_PROJECTS.map(p => [p, Array(12).fill(0)])
+);
+
+const [rawInputs, setRawInputs] = useState(initialRawInputs);
+const [numericTargets, setNumericTargets] = useState(initialNumericTargets);
+
+// on blur, commit to numericTargets
+const handleCellBlur = (project: string, mi: number) => {
+  const parsed = parseInt(rawInputs[project][mi].trim(), 10) || 0;
+  setNumericTargets(n => ({
+    ...n,
+    [project]: n[project].map((old, i) => (i === mi ? parsed : old)),
+  }));
+};
+
+const handleRawChange = (project: string, mi: number, val: string) => {
+  setRawInputs(r => ({
+    ...r,
+    [project]: r[project].map((old, i) => (i === mi ? val : old)),
+  }));
+};
+
   // State for week-of-month/week-of-year
   const [selectedWeekOfMonth, setSelectedWeekOfMonth] = useState<number | null>(null);
   const [selectedWeekOfYear, setSelectedWeekOfYear] = useState<number | null>(null);
@@ -441,6 +445,32 @@ ALL_PROJECTS.forEach((proj) => {
   if (error) {
     return <p style={{ color: "red", padding: 20 }}>Error: {error}</p>;
   }
+const perBucketTarget: Record<string, number> = {};
+
+ALL_PROJECTS.forEach(proj => {
+  const arr = numericTargets[proj] || Array(12).fill(0);
+  let val: number;
+  switch (filterMode) {
+    case "month":
+      val = arr[Number(selectedMonth) - 1];
+      break;
+    case "quarter": {
+      const q = Number(selectedQuarter);
+      const start = (q - 1) * 3;
+      val = arr.slice(start, start + 3).reduce((a, b) => a + b, 0);
+      break;
+    }
+    case "semester": {
+      const start = (selectedSemester - 1) * 6;
+      val = arr.slice(start, start + 6).reduce((a, b) => a + b, 0);
+      break;
+    }
+    case "year":
+    default:
+      val = arr.reduce((a, b) => a + b, 0);
+  }
+  perBucketTarget[proj] = val;
+});
 
   const totalChanges = filteredItems.length;
   const changesByArea: Record<string, number> = {};
@@ -448,7 +478,11 @@ ALL_PROJECTS.forEach((proj) => {
     const area = item.SheetName || "Unknown";
     changesByArea[area] = (changesByArea[area] || 0) + 1;
   });
-
+const monthlyTargetsMap: Record<string, Record<string, number>> = {};
+ALL_PROJECTS.forEach(proj => {
+  const key = `${selectedYear}-${selectedMonth.padStart(2, "0")}`; 
+  monthlyTargetsMap[proj] = { [key]: perBucketTarget[proj] };
+});
   return (
     <div className="bg-gray-100 min-h-screen p-6">
       <div className="p-6 space-y-6 bg-white rounded-lg shadow-md">
@@ -677,51 +711,68 @@ ALL_PROJECTS.forEach((proj) => {
           {selectedApi === "costPA" && (
             <>
              {/* ── TARGET INPUT TABLE ───────────────────── */}
-    <div className="bg-white rounded-lg shadow-md p-6 col-span-2">
-      <h2 className="text-xl font-semibold mb-2">
-        Set Monthly Targets per Project
-      </h2>
-      <MonthlyTargetTable
-        projects={ALL_PROJECTS}
-        initialTargets={monthlyTargets}
-        onChange={(newMap: Record<string, number[]>) =>
-          setMonthlyTargets(newMap)
+   <div className="bg-white rounded-lg shadow-md p-6 col-span-2">
+  <h2 className="text-xl font-semibold mb-2">
+    Set Monthly Targets per Project
+  </h2>
+
+  <MonthlyTargetTableContainer
+    siteId={config.siteId}
+    listId={
+      config.lists.find(l => l.name === "MonthlyTargets")!.listId
+    }
+    year={Number(selectedYear)}
+    projects={ALL_PROJECTS}
+  />
+
+  {filterMode === "semester" && (
+    <div className="mt-2">
+      <label className="mr-2">Semester:</label>
+      <select
+        value={String(selectedSemester)}
+        onChange={e =>
+          setSelectedSemester(Number(e.target.value) as 1|2)
         }
-      />
-      {/* Semester picker (only shown when filterMode="semester") */}
-      {filterMode === "semester" && (
-        <div className="mt-2">
-          <label className="mr-2">Semester:</label>
-          <select
-            value={String(selectedSemester)}
-            onChange={e =>
-              setSelectedSemester(Number(e.target.value) as 1|2)
-            }
-            className="border px-2 py-1 rounded"
-          >
-            <option value="1">H1 (Jan–Jun)</option>
-            <option value="2">H2 (Jul–Dec)</option>
-          </select>
-        </div>
-      )}
+        className="border px-2 py-1 rounded"
+      >
+        <option value="1">H1 (Jan–Jun)</option>
+        <option value="2">H2 (Jul–Dec)</option>
+      </select>
     </div>
+  )}
+</div>
+
 
     {/* ── CUMULATIVE ACTUAL vs TARGET ───────────── */}
     <div className="bg-white rounded-lg shadow-md p-6 col-span-2">
       <h2 className="text-xl font-semibold mb-2">
         Cumulative Actual vs. Target
       </h2>
-      <ProjectCostWithTargetChart
-        data={followCostItems}
-        year={Number(selectedYear)}
-        monthlyTarget={perBucketTarget}
-      />
+        <ProjectCostChart
+  siteId={config.siteId}
+  followListId={config.lists.find(l=>l.name==="FollowCostKPI")!.listId}
+  targetListId={config.lists.find(l=>l.name==="MonthlyTargets")!.listId}
+  projectId={project!.toLowerCase()}   // e.g. "mercedes-benz"
+  year={Number(selectedYear)}
+/>
+    </div>
+    {/* ── COMBINED line-only chart ─────────────────── */}
+    <div className="bg-white rounded-lg shadow-md p-6 col-span-2">
+      <h2 className="text-xl font-semibold mb-2">
+        Combined Cumulative Target
+      </h2>
+    <CombinedTargetChart
+  siteId={config.siteId}
+  followListId={config.lists.find(l=>l.name==="FollowCostKPI")!.listId}
+  targetListId={config.lists.find(l=>l.name==="MonthlyTargets")!.listId}
+  year={Number(selectedYear)}
+/>
     </div>
               {/* —————————————————————————————— */}
 {/* For *single* projects: time-series */}
 <div className="bg-white rounded-lg shadow-md p-6 col-span-2">
   <h2 className="text-xl font-semibold mb-2">Total Nett Value over Time</h2>
-  <FollowupCostTimeSeriesChart
+{/*  <FollowupCostTimeSeriesChart
     data={followCostItems}
     filterMode={filterMode}
     selectedProject={project!.toLowerCase()}
@@ -737,11 +788,15 @@ ALL_PROJECTS.forEach((proj) => {
     toYear={toYear}
     toMonth={toMonth}
     toDay={toDay}
-  />
+  />*/}
+  <FollowupCostMonthlyChart
+  data={followCostItems}
+  selectedProject={project!.toLowerCase()}
+/>
 </div>
 {/* reasons over time */}
 <div className="bg-white rounded-lg shadow-md p-6 col-span-2">
- <FollowupCostByReasonTimeSeriesChart
+{/* <FollowupCostByReasonTimeSeriesChart
     data={followCostItems}
     filterMode={filterMode}
     selectedProject={project!.toLowerCase()}
@@ -751,6 +806,20 @@ ALL_PROJECTS.forEach((proj) => {
     selectedQuarter={selectedQuarter}
     selectedWeekOfMonth={selectedWeekOfMonth ?? undefined}
     selectedWeekOfYear={selectedWeekOfYear ?? undefined}
+    fromYear={fromYear}
+    fromMonth={fromMonth}
+    fromDay={fromDay}
+    toYear={toYear}
+    toMonth={toMonth}
+    toDay={toDay}
+ />*/}
+ <FollowupCostByReasonMonthlyChart
+    data={followCostItems}
+    filterMode={filterMode}
+    selectedProject={project!.toLowerCase()}
+    selectedYear={selectedYear}
+    selectedMonth={selectedMonth}
+    selectedQuarter={selectedQuarter}
     fromYear={fromYear}
     fromMonth={fromMonth}
     fromDay={fromDay}
@@ -766,7 +835,7 @@ ALL_PROJECTS.forEach((proj) => {
       <h2 className="text-xl font-semibold mb-2">
         Total Nett Value over Time (All Projects)
       </h2>
-      <FollowupCostTimeSeriesChart
+      {/*<FollowupCostTimeSeriesChart
         data={followCostItems}
         filterMode={filterMode}
         selectedProject="draxlmaeir"       // <-- this tells it to include everything
@@ -782,14 +851,14 @@ ALL_PROJECTS.forEach((proj) => {
         toYear={toYear}
         toMonth={toMonth}
         toDay={toDay}
-      />
+      />*/}
     </div>
       {/* 1) Time-series across dates */}
       <div className="bg-white rounded-lg shadow-md p-6 col-span-2">
         <h2 className="text-xl font-semibold mb-2">
           Total Nett Value over Time
         </h2>
-      <FollowupCostProjectTimeSeriesChart
+     {/* <FollowupCostProjectTimeSeriesChart
     data={followCostItems}
     filterMode={filterMode}
     selectedYear={selectedYear}
@@ -805,7 +874,7 @@ ALL_PROJECTS.forEach((proj) => {
     toMonth={toMonth}
     toDay={toDay}
   />
-
+*/}
       </div>
 
       {/* 2) Breakdown by each sub-project */}

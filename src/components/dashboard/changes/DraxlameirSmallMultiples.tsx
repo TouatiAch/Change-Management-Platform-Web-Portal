@@ -140,83 +140,74 @@ const DraxlameirSmallMultiples: React.FC<Props> = ({ items }) => {
   });
 
   // 5) Compose the ECharts option
-  const option: EChartsOption = {
-    color: palette,
-    toolbox: {
-      show: true,
-      orient: 'vertical',
-      right: 10,
-      top: 'center',
-      feature: {
-        dataView:    { show: true, readOnly: false },
-        magicType:   { show: true, type: ['stack','bar'] }, // ← stack ↔ grouped
-        // restore omitted to disable it
-        saveAsImage: { show: true }
-      }
+const option: EChartsOption = {
+  color: palette,
+  toolbox: {
+    show: true,
+    orient: 'vertical',
+    right: 10,
+    top: 'center',
+    feature: {
+      dataView:    { show: true, readOnly: false },
+      magicType:   { show: true, type: ['stack','bar'] },
+      saveAsImage: { show: true }
+    }
+  },
+  tooltip: {
+    trigger: 'axis',
+    axisPointer: { type: 'shadow' }
+  },
+  legend: {
+    bottom: 10,             // place legend below the bars
+    orient: 'horizontal',
+    data: projects,         // your project names array
+    textStyle: { fontSize: 12 }
+  },
+  grid: {
+    left: '3%',
+    right: '4%',
+    bottom: '20%',          // leave room for the legend
+    containLabel: true
+  },
+  xAxis: {
+    type: 'category',
+    data: areas,
+    name: 'Area',
+    nameLocation: 'middle',
+    nameGap: 30,
+    nameTextStyle: {
+      backgroundColor: '#eef2f6',
+      padding: [4, 8],
+      borderRadius: 4
     },
-    tooltip: {
-      trigger: 'axis',
-      axisPointer: { type: 'shadow' }
+    axisLabel: {
+      interval: 0,
+      rotate: 0,            // keep labels horizontal
+      width: 80,            // max pixel width before wrapping
+      overflow: 'break',    // break at word boundaries, not mid-word
+      lineHeight: 16,
+      fontSize: 12,
+      color: (_val: unknown, idx?: number) =>
+        palette[(idx || 0) % palette.length]
+    }
+  },
+  yAxis: {
+    type: 'value',
+    name: 'Count',
+    nameLocation: 'middle',
+    nameGap: 50,
+    nameTextStyle: {
+      backgroundColor: '#eef2f6',
+      padding: [4, 8],
+      borderRadius: 4
     },
-    legend: {
-      top: 30,
-      data: projects
-    },
-    grid: {
-      left: '3%',
-      right: '4%',
-      bottom: '20%',
-      containLabel: true
-    },
-    xAxis: {
-      type: 'category',
-      data: areas,
-      name: 'Area',
-      nameLocation: 'middle',
-      nameGap: 30,
-      nameTextStyle: {
-        backgroundColor: '#eef2f6',
-        padding: [4, 8],
-        borderRadius: 4
-      },
-      axisLabel: {
-        interval: 0,
-        rotate: 0,
-        rich: {
-          labelBox: {
-            backgroundColor: '#f7fafc',
-            padding: [2, 6],
-            borderRadius: 4
-          }
-        },
-        formatter: '{labelBox|{value}}',
-        color: (_val: unknown, idx?: number) =>
-          palette[(idx || 0) % palette.length]
-      }
-    },
-    yAxis: {
-      type: 'value',
-      name: 'Count',
-      nameLocation: 'middle',
-      nameGap: 50,
-      nameTextStyle: {
-        backgroundColor: '#eef2f6',
-        padding: [4, 8],
-        borderRadius: 4
-      },
-      axisLabel: {
-        rich: {
-          labelBox: {
-            backgroundColor: '#f7fafc',
-            padding: [2, 6],
-            borderRadius: 4
-          }
-        },
-        formatter: '{labelBox|{value}}'
-      }
-    },
-    series
-  };
+    axisLabel: {
+      formatter: '{value}'
+    }
+  },
+  series
+};
+
 
   return (
     <div className="bg-white rounded-lg shadow-md p-6">
