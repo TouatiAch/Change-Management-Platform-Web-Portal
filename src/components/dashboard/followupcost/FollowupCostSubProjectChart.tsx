@@ -20,14 +20,14 @@ const PALETTE = ["#5470C6", "#91CC75", "#FAC858", "#EE6666", "#73C0DE"];
 
 // Friendly titles per filterMode
 const TITLE_MAP: Record<FilterMode, string> = {
-  year:        "Total Nett Value per Sub-Project",
-  quarter:     "Total Nett Value per Sub-Project",
-  month:       "Total Nett Value per Sub-Project",
-  day:         "Total Nett Value per Sub-Project",
-  weekOfMonth: "Total Nett Value per Sub-Project",
-  weekOfYear:  "Total Nett Value per Sub-Project",
-  customRange: "Total Nett Value per Sub-Project",
-  semester:    "Total Nett Value per Sub-Project",
+  year:        "Total Nett Value per Project",
+  quarter:     "Total Nett Value per Project",
+  month:       "Total Nett Value per Project",
+  day:         "Total Nett Value per Project",
+  weekOfMonth: "Total Nett Value per Project",
+  weekOfYear:  "Total Nett Value per Project",
+  customRange: "Total Nett Value per Project",
+  semester:    "Total Nett Value per Project",
 };
 
 interface Props {
