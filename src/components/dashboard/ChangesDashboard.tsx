@@ -757,9 +757,6 @@ ALL_PROJECTS.forEach(proj => {
     {/* ── COMBINED line-only chart ─────────────────── */}
     {project?.toLowerCase() === "draxlmaeir" && (
         <div className="bg-white rounded-lg shadow-md p-6 col-span-2">
-          <h2 className="text-xl font-semibold mb-2">
-            Combined Cumulative Target
-          </h2>
           <CombinedTargetChart
             siteId={config.siteId}
             followListId={
@@ -775,24 +772,6 @@ ALL_PROJECTS.forEach(proj => {
               {/* —————————————————————————————— */}
 {/* For *single* projects: time-series */}
 <div className="bg-white rounded-lg shadow-md p-6 col-span-2">
-  <h2 className="text-xl font-semibold mb-2">Total Nett Value over Time</h2>
-{/*  <FollowupCostTimeSeriesChart
-    data={followCostItems}
-    filterMode={filterMode}
-    selectedProject={project!.toLowerCase()}
-    selectedYear={selectedYear}
-    selectedMonth={selectedMonth}
-    selectedDay={selectedDay}
-    selectedQuarter={selectedQuarter}
-    selectedWeekOfMonth={selectedWeekOfMonth ?? undefined}
-    selectedWeekOfYear={selectedWeekOfYear ?? undefined}
-    fromYear={fromYear}
-    fromMonth={fromMonth}
-    fromDay={fromDay}
-    toYear={toYear}
-    toMonth={toMonth}
-    toDay={toDay}
-  />*/}
   <FollowupCostMonthlyChart
   data={followCostItems}
   selectedProject={project!.toLowerCase()}
@@ -834,57 +813,10 @@ ALL_PROJECTS.forEach(proj => {
  </div>
   {project?.toLowerCase() === "draxlmaeir" && (
     <>
-    {/* 1) Total Nett Value (ALL projects) over Time */}
-    <div className="bg-white rounded-lg shadow-md p-6 col-span-2">
-      <h2 className="text-xl font-semibold mb-2">
-        Total Nett Value over Time (All Projects)
-      </h2>
-      {/*<FollowupCostTimeSeriesChart
-        data={followCostItems}
-        filterMode={filterMode}
-        selectedProject="draxlmaeir"       // <-- this tells it to include everything
-        selectedYear={selectedYear}
-        selectedMonth={selectedMonth}
-        selectedDay={selectedDay}
-        selectedQuarter={selectedQuarter}
-        selectedWeekOfMonth={selectedWeekOfMonth ?? undefined}
-        selectedWeekOfYear={selectedWeekOfYear ?? undefined}
-        fromYear={fromYear}
-        fromMonth={fromMonth}
-        fromDay={fromDay}
-        toYear={toYear}
-        toMonth={toMonth}
-        toDay={toDay}
-      />*/}
-    </div>
-      {/* 1) Time-series across dates */}
-      <div className="bg-white rounded-lg shadow-md p-6 col-span-2">
-        <h2 className="text-xl font-semibold mb-2">
-          Total Nett Value over Time
-        </h2>
-     {/* <FollowupCostProjectTimeSeriesChart
-    data={followCostItems}
-    filterMode={filterMode}
-    selectedYear={selectedYear}
-    selectedMonth={selectedMonth}
-    selectedDay={selectedDay}
-    selectedQuarter={selectedQuarter}
-    selectedWeekOfMonth={selectedWeekOfMonth ?? undefined}
-    selectedWeekOfYear={selectedWeekOfYear ?? undefined}
-    fromYear={fromYear}
-    fromMonth={fromMonth}
-    fromDay={fromDay}
-    toYear={toYear}
-    toMonth={toMonth}
-    toDay={toDay}
-  />
-*/}
-      </div>
-
       {/* 2) Breakdown by each sub-project */}
       <div className="bg-white rounded-lg shadow-md p-6 col-span-2">
         <h2 className="text-xl font-semibold mb-2">
-          Total Nett Value per Sub-Project
+          Total Nett Value per Project
         </h2>
         <FollowupCostSubProjectChart
           data={followCostItems}
@@ -907,7 +839,7 @@ ALL_PROJECTS.forEach(proj => {
       {/* 3) And finally your "per project × reason" */}
       <div className="bg-white rounded-lg shadow-md p-6 col-span-2">
         <h2 className="text-xl font-semibold mb-2">
-          Total Nett Value per Project × Reason
+          Total Nett Value per Project and per Reason
         </h2>
         <FollowupCostByProjectReasonChart
           data={followCostItems}
