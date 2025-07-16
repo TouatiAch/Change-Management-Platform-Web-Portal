@@ -745,29 +745,35 @@ ALL_PROJECTS.forEach(proj => {
 
     {/* ── CUMULATIVE ACTUAL vs TARGET ───────────── */}
     <div className="bg-white rounded-lg shadow-md p-6 col-span-2">
-      <h2 className="text-xl font-semibold mb-2">
-        Cumulative Actual vs. Target
-      </h2>
-        <ProjectCostChart
-  siteId={config.siteId}
-  followListId={config.lists.find(l=>l.name==="FollowCostKPI")!.listId}
-  targetListId={config.lists.find(l=>l.name==="MonthlyTargets")!.listId}
-  projectId={project!.toLowerCase()}   // e.g. "mercedes-benz"
-  year={Number(selectedYear)}
-/>
+      
+       {project!.toLowerCase() !== "draxlmaeir" && (
+  <ProjectCostChart
+    siteId={config.siteId}
+    followListId={config.lists.find(l => l.name === "FollowCostKPI")!.listId}
+    targetListId={config.lists.find(l => l.name === "MonthlyTargets")!.listId}
+    projectId={project!.toLowerCase()}
+    year={Number(selectedYear)}
+  />
+)}
     </div>
     {/* ── COMBINED line-only chart ─────────────────── */}
-    <div className="bg-white rounded-lg shadow-md p-6 col-span-2">
-      <h2 className="text-xl font-semibold mb-2">
-        Combined Cumulative Target
-      </h2>
-    <CombinedTargetChart
-  siteId={config.siteId}
-  followListId={config.lists.find(l=>l.name==="FollowCostKPI")!.listId}
-  targetListId={config.lists.find(l=>l.name==="MonthlyTargets")!.listId}
-  year={Number(selectedYear)}
-/>
-    </div>
+    {project?.toLowerCase() === "draxlmaeir" && (
+        <div className="bg-white rounded-lg shadow-md p-6 col-span-2">
+          <h2 className="text-xl font-semibold mb-2">
+            Combined Cumulative Target
+          </h2>
+          <CombinedTargetChart
+            siteId={config.siteId}
+            followListId={
+              config.lists.find(l => l.name === "FollowCostKPI")!.listId
+            }
+            targetListId={
+              config.lists.find(l => l.name === "MonthlyTargets")!.listId
+            }
+            year={Number(selectedYear)}
+          />
+        </div>
+      )}
               {/* —————————————————————————————— */}
 {/* For *single* projects: time-series */}
 <div className="bg-white rounded-lg shadow-md p-6 col-span-2">

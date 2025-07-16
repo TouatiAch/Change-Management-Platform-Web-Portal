@@ -128,11 +128,22 @@ export const ProjectCostChart: React.FC<Props> = ({
       axisLabel: { formatter: "{value}" }
     },
     series: [
-      {
-        name: "Actual",
-        type: "bar",
-        data: monthlyActual.map(v => +v.toFixed(0)),
-      },
+               {
+            name: "Actual",
+            type: "bar",
+            data: monthlyActual.map(v => +v.toFixed(0)),
+            label: {
+              show: true,
+              position: "top",          // or "inside" if you prefer
+              formatter: "{c}",
+              backgroundColor: "auto",  // match the bar color
+              padding: [4, 8],
+              borderRadius: 4,
+              color: "#fff",
+              offset: [0, -6],          // lift it just above the bar
+              fontSize: 12
+            }
+          },
       {
         name: "Target",
         type: "line",

@@ -590,14 +590,6 @@ const handleSaveCarName = async () => {
           {activeTab === "areaImages" && (
   <AreaImageUploadComponent projects={projects} />
 )}
-
-          <button
-            onClick={handleSave}
-            className="mt-8 px-6 py-2 bg-[#1cb3d2] rounded-xl font-medium hover:opacity-90 transition"
-          >
-            Save Configuration
-          </button>
-
           {message && <p className="mt-4 text-yellow-200">{message}</p>}
         </main>
       </div>
