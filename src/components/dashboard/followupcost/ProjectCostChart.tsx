@@ -109,11 +109,17 @@ export const ProjectCostChart: React.FC<Props> = ({
   }
 
   const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-
+const humanProjectName = projectId
+  .split('-')
+  .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+  .join(' ');
   return (
     <ReactECharts
   option={{
-    title: { text: "Actual vs. Cumulative Target", left: "center" },
+   title: {
+     text: `${humanProjectName} – Actual vs. Cumulative Target`,
+     left: "center"
+   },
     tooltip: { trigger: "axis" },
     legend: { data: ["Actual","Target"], top: 24 },
     toolbox: { feature: { saveAsImage: {} } },

@@ -56,14 +56,20 @@ function getSectionStatus(endDateValue?: string) {
 }
 
 // --- Robust ISO date normalization helper ---
-function toISODate(str?: string | null): string | null {
+function toISODate(str?: string|null): string|null {
   if (!str) return null;
-  // Already ISO format?
-  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
-  const d = new Date(str);
-  if (isNaN(d as any)) return null;
-  return d.toISOString().slice(0, 10);
+  // allow 1 or 2 digits for day/month, and 2 or 4 digits for year
+  const m = /^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})$/.exec(str);
+  if (!m) return null;
+  let [ , dd, mm, yy ] = m;
+  // normalize to 2-digit day/month
+  if (dd.length === 1) dd = '0'+dd;
+  if (mm.length === 1) mm = '0'+mm;
+  // normalize 2-digit year to 4-digit (assuming 20xx)
+  const yyyy = yy.length === 2 ? '20'+yy : yy;
+  return `${yyyy}-${mm}-${dd}`;
 }
+
 
 // --- Robust working days calculation ---
 const calculateWorkingDays = (start: string, end: string): number | string => {
@@ -188,7 +194,7 @@ const DetailsPage: React.FC<DetailsPageProps> = ({ fieldsConfig }) => {
   // Field input type logic
   const getInputType = (key: string) => {
     const k = key.toLowerCase();
-    if (k.includes("date")) return "date";
+    if (k.includes("date")) return "text";
     if (k.includes("cost") || k.includes("downtime") || k.includes("workingdays") || k.includes("scrap")) return "number";
     return "text";
   };
@@ -272,11 +278,12 @@ const DetailsPage: React.FC<DetailsPageProps> = ({ fieldsConfig }) => {
         {/* Start Date */}
         <div className="flex flex-col w-32">
           <label className="block font-semibold mb-1 text-white">Start date</label>
-          {editingField === startKey ? (
+           {editingField === startKey ? (
             <input
               ref={inputRef}
               className="w-full px-4 py-2 bg-white/80 text-black rounded-xl shadow-sm outline-none focus:ring-2 focus:ring-blue-400"
-              type="date"
+              type="text"
+              placeholder="DD/MM/YYYY"
               value={editedValue}
               onChange={(e) => setEditedValue(e.target.value)}
               onBlur={() => handleSave(startKey, editedValue)}
@@ -285,7 +292,7 @@ const DetailsPage: React.FC<DetailsPageProps> = ({ fieldsConfig }) => {
               }}
             />
           ) : (
-            <div
+           <div
               className="w-full px-4 py-2 bg-white/80 text-black rounded-xl shadow-sm cursor-pointer text-center"
               onClick={() => handleEditStart(startKey, f[startKey] ?? "")}
             >
@@ -300,7 +307,8 @@ const DetailsPage: React.FC<DetailsPageProps> = ({ fieldsConfig }) => {
             <input
               ref={inputRef}
               className="w-full px-4 py-2 bg-white/80 text-black rounded-xl shadow-sm outline-none focus:ring-2 focus:ring-blue-400"
-              type="date"
+              type="text"
+              placeholder="DD/MM/YYYY"
               value={editedValue}
               onChange={(e) => setEditedValue(e.target.value)}
               onBlur={() => handleSave(endKey, editedValue)}

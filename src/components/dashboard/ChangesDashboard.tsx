@@ -681,7 +681,6 @@ ALL_PROJECTS.forEach(proj => {
       (() => {
         const phaseCfg = config.lists.find(l => l.name === "Phase4Targets");
         if (!phaseCfg) {
-          // you could render an error component instead of throwing
           throw new Error("Phase4Targets list not found in configuration");
         }
         return phaseCfg.listId;
@@ -689,7 +688,6 @@ ALL_PROJECTS.forEach(proj => {
     }
     siteId={config.siteId}
     getToken={async () => {
-      // writing also requires Manage.All
       const tok = await getAccessToken(msalInstance, ["Sites.Manage.All"]);
       if (!tok) throw new Error("No token");
       return tok;
@@ -934,25 +932,30 @@ ALL_PROJECTS.forEach(proj => {
           )}
 {/* --- DRX IDEA --- */}
 {selectedApi === "drxIdea" && (
-  <>
+  <>{project?.toLowerCase() === "draxlmaeir" && (
     <div className="bg-white rounded-lg shadow-md p-6 col-span-2">
       <h2 className="text-xl font-semibold mb-2">
         Detailed DRX Idea Entries
       </h2>
       <DRXEntriesChart />
     </div>
+    )}
   </>
 )}
 
 {/* --- BUDGET --- */}
 {selectedApi === "budget" && (
+
   <>
+   {project?.toLowerCase() === "draxlmaeir" && (
     <div className="bg-white rounded-lg shadow-md p-6 col-span-2">
       <h2 className="text-xl font-semibold mb-2">
         Detailed Budget Entries
       </h2>
+
       <BudgetEntriesChart />
     </div>
+    )}
   </>
 )}
 
