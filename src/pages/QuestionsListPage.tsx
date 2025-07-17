@@ -168,26 +168,16 @@ const QuestionsListPage: React.FC = () => {
                       {q.responseReceived ? "Yes" : "No"}
                     </span>
                   </div>
-                  <div>
-                    {q.responseReceived ? (
-                      <button
-                        onClick={() =>
-                          navigate(`/response/${projectKey}/${phase}/${itemId}/${q.id}`)
-                        }
-                        className="px-3 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition"
-                      >
-                        View Response
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => onCheck(q)}
-                        disabled={checkingMap[q.id]}
-                        className="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 transition"
-                      >
-                        {checkingMap[q.id] ? "Checking…" : "Check Response"}
-                      </button>
-                    )}
-                  </div>
+                 <div>
+  <button
+    onClick={() => onCheck(q)}
+    disabled={checkingMap[q.id]}
+    className="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 transition"
+  >
+    {checkingMap[q.id] ? "Checking…" : "Check Response"}
+  </button>
+</div>
+
                 </div>
               )}
             </div>

@@ -1,5 +1,4 @@
 // src/pages/SendEmailPage.tsx
-
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { ToastContainer, toast } from "react-toastify";
@@ -61,10 +60,10 @@ export default function SendEmailPage() {
       <TopMenu />
 
       <button
-        onClick={() => navigate(-1)}
+        onClick={() => navigate(`/questions/${projectKey}/${phase}/${itemId}`)}
         className="absolute top-4 left-4 px-3 py-2 bg-white/20 hover:bg-white/30 rounded-2xl shadow-md"
       >
-        ← Back
+        ← Back to Questions
       </button>
 
       <div className="max-w-2xl mx-auto py-12 px-4">
@@ -83,22 +82,31 @@ export default function SendEmailPage() {
             onSaveOrSend={async (updated, action) => {
               try {
                 if (action === "save") {
-                  // Persist changes to SharePoint
+                  // Persist settings only
                   await graphService.saveQuestion(updated);
                   setQ(updated);
                   toast.success("Settings saved");
                 } else {
-                  // Build full email and send
+                  // Build full email payload
                   const toSend: QuestionState = {
                     ...updated,
                     emailsubject: fixedSubject + updated.emailsubject!,
                     emailbody:    fixedBody   + updated.emailbody!
                   };
-                  const latest = await graphService.sendMail(toSend, fixedSubject);
-                  setQ(latest);
+                  // 1) Send the email
+                  await graphService.sendMail(toSend);
+                  // 2) Patch SharePoint item with lastSent & reset responseReceived
+                  const nowIso = new Date().toISOString();
+                  const patched: QuestionState = {
+                    ...toSend,
+                    lastSent:         nowIso,
+                    responseReceived: false
+                  };
+                  await graphService.saveQuestion(patched);
+                  setQ(patched);
                   toast.success("Email sent");
-                  // Return to list
-                  navigate(`/send-email/${projectKey}/${phase}/${itemId}`);
+                  // 3) Navigate back to the explicit questions list URL
+                  navigate(`/questions/${projectKey}/${phase}/${itemId}`);
                 }
               } catch (err: any) {
                 console.error(err);
