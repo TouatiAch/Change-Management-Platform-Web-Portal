@@ -19,7 +19,6 @@ import DashboardLayout           from "./components/dashboard/DashboardLayout";
 import AddQuestionPage           from "./pages/AddQuestionPage";
 import QuestionsListPage         from "./pages/QuestionsListPage";
 import SendEmailPage             from "./pages/SendEmailPage";
-import ResponsePage              from "./pages/ResponsePage";
 
 import ToolSelectionPage         from "./pages/ToolSelectionPage";
 import SharePointUploaderPage    from "./pages/SharePointUploaderPage";
@@ -38,6 +37,7 @@ import { getConfig }             from "./services/configService";
 import DowntimeListManager from "./components/kpiEntry/DowntimeListManager";
 import BudgetsListManager from "./components/kpiEntry/BudgetsListManager";
 import DrxListManager from "./components/kpiEntry/DrxListManager";
+import UserProfilePage from "./pages/UserProfilePage";
 const App: React.FC = () => {
   // grab your saved config once
   const cfg = getConfig();
@@ -63,7 +63,6 @@ const App: React.FC = () => {
       <Route path="/send-email/:projectKey/:phase/:itemId"      element={<QuestionsListPage />} />
       <Route path="/send-email/:projectKey/:phase/:itemId/add-question" element={<AddQuestionPage />} />
       <Route path="/send-email/:projectKey/:phase/:itemId/:questionId" element={<SendEmailPage />} />
-      <Route path="/response/:projectKey/:phase/:itemId/:questionId"   element={<ResponsePage />} />
 
       {/* extra phases */}
       <Route path="/changes/:projectKey/implementation-extra" element={<ChangeItemsImplementation />} />
@@ -107,6 +106,7 @@ const App: React.FC = () => {
       <Route path="/kpi-editor/downtime" element={<DowntimeKPIEditor />} />
       <Route path="/kpi-editor/budget"   element={<BudgetKPIEditor />} />
       <Route path="/follow-cost-editor"  element={<FollowCostKPIEditor />} />
+      <Route path="/user-profile" element={<UserProfilePage />} />
 
       {/* 404 */}
       <Route path="*" element={<NotFoundPage />} />

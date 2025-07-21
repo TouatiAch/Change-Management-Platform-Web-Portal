@@ -60,7 +60,7 @@ export default function SendEmailPage() {
       <TopMenu />
 
       <button
-        onClick={() => navigate(`/questions/${projectKey}/${phase}/${itemId}`)}
+        onClick={() => navigate(`/send-email/${projectKey}/${phase}/${itemId}`)}
         className="absolute top-4 left-4 px-3 py-2 bg-white/20 hover:bg-white/30 rounded-2xl shadow-md"
       >
         ← Back to Questions
@@ -106,7 +106,7 @@ export default function SendEmailPage() {
                   setQ(patched);
                   toast.success("Email sent");
                   // 3) Navigate back to the explicit questions list URL
-                  navigate(`/questions/${projectKey}/${phase}/${itemId}`);
+                  navigate(`/send-email/${projectKey}/${phase}/${itemId}`);
                 }
               } catch (err: any) {
                 console.error(err);

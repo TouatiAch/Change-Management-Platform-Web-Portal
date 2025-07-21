@@ -1,4 +1,3 @@
-// src/components/kpiEntry/KpiListManager.tsx
 import React, { useState, useEffect, useMemo } from "react";
 import axios from "axios";
 import type { ListConfig, IProject } from "../../services/configService";
@@ -11,7 +10,6 @@ interface Props {
   siteId: string;
   listConfig: ListConfig;
   projects: IProject[];
-  /** must return a Graph token with appropriate scope */
   getToken: () => Promise<string>;
 }
 
@@ -21,55 +19,44 @@ export default function KpiListManager({
   projects,
   getToken,
 }: Props) {
-  // ── State ─────────────────────────────────────────────────────────
   const [items, setItems] = useState<ItemRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Table filters
   const [filterYear, setFilterYear] = useState("All");
   const [filterMonth, setFilterMonth] = useState("All");
   const [filterQuarter, setFilterQuarter] = useState("All");
 
-  // Pagination
   const pageSize = 10;
   const [page, setPage] = useState(1);
 
-  // ── Build empty newRow, but remove rateofdowntime (we calculate it)
   const emptyRow: NewRow = {};
   listConfig.fields.forEach((f) => {
     emptyRow[f.name] = "";
   });
   delete emptyRow.rateofdowntime;
+
   const [newRow, setNewRow] = useState<NewRow>({ ...emptyRow });
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
 
-
   const isFormValid = useMemo(() => {
-  // if your list has projects, require one
-  if (listConfig.hasProject && !newRow.Project) return false;
-
-  // check numeric fields
-  for (const f of listConfig.fields) {
-    if (f.name === "rateofdowntime") continue;
-    const v = newRow[f.name];
-    if (f.type === "Number" && v !== "" && isNaN(Number(String(v).replace(",", ".")))) {
-      return false;
+    if (listConfig.hasProject && !newRow.Project) return false;
+    for (const f of listConfig.fields) {
+      if (f.name === "rateofdowntime") continue;
+      const v = newRow[f.name];
+      if (f.type === "Number" && v !== "" && isNaN(Number(String(v).replace(",", ".")))) {
+        return false;
+      }
     }
-  }
-  return true;
-}, [newRow, listConfig]);
-
-
-// ── Fetch Items ───────────────────────────────────────────────────
+    return true;
+  }, [newRow, listConfig]);
   const fetchItems = async () => {
     setLoading(true);
     setError(null);
     try {
       const token = await getToken();
       const resp = await axios.get(
-        `https://graph.microsoft.com/v1.0/sites/${siteId}` +
-        `/lists/${listConfig.listId}/items?$expand=fields&$top=500`,
+        `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listConfig.listId}/items?$expand=fields&$top=500`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
@@ -77,7 +64,7 @@ export default function KpiListManager({
         resp.data.value.map((i: any) => {
           const fld = i.fields as Record<string, any>;
           const downtime = Number(fld.downtime) || 0;
-          const prodMin  = Number(fld.productionminutes) || 0;
+          const prodMin = Number(fld.productionminutes) || 0;
           const rate = prodMin > 0 ? downtime / prodMin : 0;
           return {
             id: String(i.id),
@@ -92,68 +79,52 @@ export default function KpiListManager({
       setLoading(false);
     }
   };
+
   useEffect(() => {
     fetchItems();
   }, [listConfig.listId]);
 
-  // ── Static Ranges ─────────────────────────────────────────────────
-  const yearsList = useMemo(
-    () => Array.from({ length: 151 }, (_, i) => (2000 + i).toString()),
-    []
-  );
-  const monthsList = useMemo(
-    () => Array.from({ length: 12 }, (_, i) => (i + 1).toString()),
-    []
-  );
+  const yearsList = useMemo(() => Array.from({ length: 151 }, (_, i) => (2000 + i).toString()), []);
+  const monthsList = useMemo(() => Array.from({ length: 12 }, (_, i) => (i + 1).toString()), []);
   const quartersList = useMemo(() => ["1", "2", "3", "4"], []);
   const yearsFilter = useMemo(() => ["All", ...yearsList], [yearsList]);
   const monthsFilter = useMemo(() => ["All", ...monthsList], [monthsList]);
   const quartersFilter = useMemo(() => ["All", ...quartersList], [quartersList]);
 
-  // ── Filter & Pagination ────────────────────────────────────────────
   const filtered = useMemo(
     () =>
       items.filter((i) => {
         const yearMatch = filterYear === "All" || String(i.year) === filterYear;
         const monthMatch = filterMonth === "All" || String(i.Month) === filterMonth;
-        const quarterMatch =
-          filterQuarter === "All" || String(i.Quarter) === filterQuarter;
+        const quarterMatch = filterQuarter === "All" || String(i.Quarter) === filterQuarter;
         return yearMatch && monthMatch && quarterMatch;
       }),
     [items, filterYear, filterMonth, filterQuarter]
   );
+
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const pageItems = filtered.slice((page - 1) * pageSize, page * pageSize);
-
-  // ── Validation ────────────────────────────────────────────────────
   const validateNewRow = () => {
-  const errs: Record<string, string> = {};
-
-  // 1️⃣ If this list uses projects, make sure one is chosen
-  if (listConfig.hasProject && !newRow.Project) {
-    errs.Project = "Please select a project.";
-  }
-
-  // 2️⃣ Existing numeric‐type checks
-  listConfig.fields.forEach((f) => {
-    if (f.name === "rateofdowntime") return;
-    const v = newRow[f.name];
-    if (f.type === "Number" && v !== "" && isNaN(Number(String(v).replace(",", ".")))) {
-      errs[f.name] = `${f.label ?? f.name} must be a number`;
+    const errs: Record<string, string> = {};
+    if (listConfig.hasProject && !newRow.Project) {
+      errs.Project = "Please select a project.";
     }
-  });
-
-  setValidationErrors(errs);
-  return Object.keys(errs).length === 0;
-};
-  // ── CRUD ───────────────────────────────────────────────────────────
+    listConfig.fields.forEach((f) => {
+      if (f.name === "rateofdowntime") return;
+      const v = newRow[f.name];
+      if (f.type === "Number" && v !== "" && isNaN(Number(String(v).replace(",", ".")))) {
+        errs[f.name] = `${f.label ?? f.name} must be a number`;
+      }
+    });
+    setValidationErrors(errs);
+    return Object.keys(errs).length === 0;
+  };
 
   const createItem = async () => {
     if (!validateNewRow()) return;
     setError(null);
     try {
       const token = await getToken();
-      // normalize all numeric fields
       const fieldsPayload = Object.fromEntries(
         Object.entries(newRow).map(([k, v]) => {
           const cfgFld = listConfig.fields.find(f => f.name === k);
@@ -164,8 +135,7 @@ export default function KpiListManager({
         })
       );
       await axios.post(
-        `https://graph.microsoft.com/v1.0/sites/${siteId}` +
-        `/lists/${listConfig.listId}/items`,
+        `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listConfig.listId}/items`,
         { fields: fieldsPayload },
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -187,8 +157,7 @@ export default function KpiListManager({
         value = Number(raw.replace(",", "."));
       }
       await axios.patch(
-        `https://graph.microsoft.com/v1.0/sites/${siteId}` +
-        `/lists/${listConfig.listId}/items/${id}/fields`,
+        `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listConfig.listId}/items/${id}/fields`,
         { [field]: value },
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -203,8 +172,7 @@ export default function KpiListManager({
     try {
       const token = await getToken();
       await axios.delete(
-        `https://graph.microsoft.com/v1.0/sites/${siteId}` +
-        `/lists/${listConfig.listId}/items/${id}`,
+        `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listConfig.listId}/items/${id}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       fetchItems();
@@ -212,17 +180,13 @@ export default function KpiListManager({
       setError(e.message || "Delete failed");
     }
   };
-
-  // ── Render ─────────────────────────────────────────────────────────
   return (
-    <div className="bg-white/10 border border-white/20 rounded-xl p-8 shadow-xl min-h-[80vh] space-y-6">
-      {/* Header */}
-      <h2 className="text-2xl font-bold text-white">{listConfig.name}</h2>
+    <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-xl shadow-lg p-8 space-y-6">
+      <h2 className="text-3xl font-bold text-white">{listConfig.name}</h2>
       {error && <p className="text-red-400">{error}</p>}
 
-      {/* Add New Row Form */}
-      <div className="bg-white/10 p-6 rounded-lg space-y-4">
-        <h3 className="text-xl font-semibold text-white">Add New Row</h3>
+      <div className="bg-white/5 p-6 rounded-xl space-y-4">
+        <h3 className="text-xl text-white/80 font-semibold mb-2">Add New Entry</h3>
 
         {listConfig.hasProject && (
           <ProjectCarousel
@@ -233,50 +197,53 @@ export default function KpiListManager({
             }
           />
         )}
-
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {listConfig.fields.map((f) => {
-            // skip the calculated field
             if (f.name === "rateofdowntime") return null;
+
+            const opts =
+              f.name.toLowerCase() === "year"
+                ? yearsList
+                : f.name.toLowerCase() === "month"
+                ? monthsList
+                : f.name.toLowerCase() === "quarter"
+                ? quartersList
+                : null;
+
+            const labelContent = (
+              <label className="text-white text-base font-bold mb-1">
+                {f.label}{" "}
+              </label>
+            );
+
             return (
               <div key={f.name} className="flex flex-col">
-                <label className="text-sm font-medium text-white mb-1">
-                  {f.label}
-                </label>
-                {["year","month","quarter"].includes(f.name.toLowerCase()) ? (
-                  (() => {
-                    const opts =
-                      f.name.toLowerCase() === "year"
-                        ? yearsList
-                        : f.name.toLowerCase() === "month"
-                        ? monthsList
-                        : quartersList;
-                    return (
-                      <select
-                        className="p-2 rounded bg-white/20 text-black"
-                        value={String(newRow[f.name] || "")}
-                        onChange={(e) =>
-                          setNewRow((r) => ({ ...r, [f.name]: e.target.value }))
-                        }
-                      >
-                        <option value="">Select {f.name}</option>
-                        {opts.map((o) => (
-                          <option key={o} value={o}>
-                            {o}
-                          </option>
-                        ))}
-                      </select>
-                    );
-                  })()
+                {labelContent}
+                {opts ? (
+                  <select
+                    className="px-4 py-2 rounded-full bg-white/80 text-black text-sm font-medium shadow focus:outline-none"
+                    value={String(newRow[f.name] || "")}
+                    onChange={(e) =>
+                      setNewRow((r) => ({ ...r, [f.name]: e.target.value }))
+                    }
+                  >
+                    <option value="">Select {f.name}</option>
+                    {opts.map((o) => (
+                      <option key={o} value={o}>
+                        {o}
+                      </option>
+                    ))}
+                  </select>
                 ) : (
                   <input
-                    type="text"
+                    type={f.type === "Number" ? "number" : "text"}
                     inputMode={f.type === "Number" ? "decimal" : undefined}
                     value={String(newRow[f.name] || "")}
                     onChange={(e) =>
                       setNewRow((r) => ({ ...r, [f.name]: e.target.value }))
                     }
-                    className="p-2 rounded bg-white/20 text-black"
+                    className="px-4 py-2 text-center text-lg font-bold rounded-full bg-white/80 text-black shadow focus:outline-none"
+                    placeholder={f.label}
                   />
                 )}
                 {validationErrors[f.name] && (
@@ -292,101 +259,74 @@ export default function KpiListManager({
         <button
           onClick={createItem}
           disabled={!isFormValid}
-          className="mt-4 px-6 py-3 bg-blue-600 text-white rounded hover:bg-blue-700"
+          className="mt-4 px-6 py-3 bg-white/20 hover:bg-white/30 rounded-2xl shadow-md text-white font-semibold transition"
         >
           Save
         </button>
       </div>
-
-      {/* Table Filters */}
       <div className="flex flex-wrap gap-4">
-        <select
-          className="p-2 rounded bg-white/20 text-white"
-          value={filterYear}
-          onChange={(e) => {
-            setFilterYear(e.target.value);
-            setPage(1);
-          }}
-        >
-          {yearsFilter.map((y) => (
-            <option key={y} value={y} className="text-black">
-              {y === "All" ? "All Years" : y}
-            </option>
-          ))}
-        </select>
-        <select
-          className="p-2 rounded bg-white/20 text-white"
-          value={filterMonth}
-          onChange={(e) => {
-            setFilterMonth(e.target.value);
-            setPage(1);
-          }}
-        >
-          {monthsFilter.map((m) => (
-            <option key={m} value={m} className="text-black">
-              {m === "All" ? "All Months" : m}
-            </option>
-          ))}
-        </select>
-        <select
-          className="p-2 rounded bg-white/20 text-white"
-          value={filterQuarter}
-          onChange={(e) => {
-            setFilterQuarter(e.target.value);
-            setPage(1);
-          }}
-        >
-          {quartersFilter.map((q) => (
-            <option key={q} value={q} className="text-black">
-              {q === "All" ? "All Quarters" : q}
-            </option>
-          ))}
-        </select>
+        {[["Year", filterYear, setFilterYear, yearsFilter],
+          ["Month", filterMonth, setFilterMonth, monthsFilter],
+          ["Quarter", filterQuarter, setFilterQuarter, quartersFilter]
+        ].map(([label, value, setter, options], idx) => (
+          <select
+            key={idx}
+            className="px-4 py-2 rounded-full bg-white/80 text-black font-medium shadow"
+            value={value as string}
+            onChange={(e) => {
+              (setter as React.Dispatch<React.SetStateAction<string>>)(e.target.value);
+              setPage(1);
+            }}
+          >
+            {(options as string[]).map((o) => (
+              <option key={o} value={o}>
+                {o === "All" ? `All ${label}` : o}
+              </option>
+            ))}
+          </select>
+        ))}
       </div>
 
-      {/* Table */}
       {loading ? (
         <p className="text-white">Loading…</p>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-white">
             <thead>
-              <tr>
+              <tr className="border-b border-white/20 bg-white/5">
                 {listConfig.fields.map((f) => (
-                  <th
-                    key={f.name}
-                    className="border-b pb-2 text-left text-white"
-                  >
-                    {f.label}
-                  </th>
+                  <th key={f.name} className="px-3 py-2 text-left">{f.label}</th>
                 ))}
-                <th className="border-b pb-2 text-white">Actions</th>
+                <th className="px-3 py-2 text-left">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {pageItems.map((row) => (
-                <tr key={row.id} className="border-t">
+              {pageItems.map((row, idx) => (
+                <tr
+                  key={row.id}
+                  className={`border-t border-white/10 ${idx % 2 === 0 ? "bg-white/5" : ""} hover:bg-white/10`}
+                >
                   {listConfig.fields.map((f) => (
-                    <td key={f.name} className="p-2">
+                    <td key={f.name} className="px-3 py-2">
                       {f.name === "rateofdowntime" ? (
                         <span>{row.rateofdowntime}</span>
                       ) : (
                         <input
-                          type="text"
+                          type={f.type === "Number" ? "number" : "text"}
                           inputMode={f.type === "Number" ? "decimal" : undefined}
                           defaultValue={String(row[f.name] ?? "")}
                           onBlur={(e) =>
                             updateItem(row.id, f.name, e.target.value)
                           }
-                          className="w-full p-1 rounded bg-white/20 text-black"
+                          className="w-full px-3 py-1 rounded-full bg-white/80 text-black font-semibold shadow focus:outline-none"
                         />
                       )}
                     </td>
                   ))}
-                  <td className="p-2">
+                  <td className="px-3 py-2">
                     <button
                       onClick={() => deleteItem(row.id)}
-                      className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700"
+                      className="px-4 py-2 bg-red-600 hover:bg-red-700 rounded-2xl shadow-sm text-white"
                     >
                       Delete
                     </button>
@@ -398,12 +338,11 @@ export default function KpiListManager({
         </div>
       )}
 
-      {/* Pagination */}
       <div className="flex justify-between items-center text-white">
         <button
           disabled={page <= 1}
           onClick={() => setPage((p) => Math.max(1, p - 1))}
-          className="px-4 py-1 bg-gray-600 rounded disabled:opacity-50"
+          className="px-4 py-1 bg-white/10 hover:bg-white/20 rounded shadow-md disabled:opacity-40"
         >
           Previous
         </button>
@@ -413,7 +352,7 @@ export default function KpiListManager({
         <button
           disabled={page >= totalPages}
           onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-          className="px-4 py-1 bg-gray-600 rounded disabled:opacity-50"
+          className="px-4 py-1 bg-white/10 hover:bg-white/20 rounded shadow-md disabled:opacity-40"
         >
           Next
         </button>

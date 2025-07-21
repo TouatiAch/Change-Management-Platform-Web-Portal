@@ -120,6 +120,7 @@ const ToolSelectionPage: React.FC = () => {
     { img: kpiBtn, label: "KPIs Entry", route: "/kpis" },
     { img: dashBtn, label: "Dashboard", route: "/dashboard" },
     { img: settingsIc, label: "Settings", route: "/config" },
+    { img: draxlLogo, label: "User Profile", route: "/user-profile" },
   ].map(({ img, label, route }) => (
     <button
       key={label}

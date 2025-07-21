@@ -1,6 +1,7 @@
 // src/components/email/EmailSettings.tsx
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { IntervalUnit, QuestionState } from "../../pages/types";
+import { getGraphToken } from "../../hooks/useGraphAuth";
 
 export interface EmailSettingsProps {
   q: QuestionState;
@@ -16,6 +17,12 @@ export interface EmailSettingsProps {
 
 const INTERVAL_UNITS: IntervalUnit[] = ["Minutes", "Hours", "Days"];
 
+interface Person {
+  id: string;
+  displayName: string;
+  scoredEmailAddresses: { address: string }[];
+}
+
 const EmailSettings: React.FC<EmailSettingsProps> = ({
   q,
   fixedSubject,
@@ -24,21 +31,43 @@ const EmailSettings: React.FC<EmailSettingsProps> = ({
   initialCustomBody,
   onSaveOrSend
 }) => {
-  // === form state ===
-  const [respEmail, setRespEmail]     = useState(q.responsibleEmail);
-  const [cc, setCc]                   = useState(q.cc || "");
-  const [value, setValue]             = useState(q.sendIntervalValue);
-  const [unit, setUnit]               = useState<IntervalUnit>(q.sendIntervalUnit);
+  // form state
+  const [people,    setPeople]    = useState<Person[]>([]);
+  const [respEmail, setRespEmail] = useState(q.responsibleEmail);
+  const [ccList,    setCcList]    = useState<string[]>([]);
+  const [value,     setValue]     = useState(q.sendIntervalValue);
+  const [unit,      setUnit]      = useState<IntervalUnit>(q.sendIntervalUnit);
 
-  // ** only the custom suffix bits here **
+  // custom bits
   const [subjectPart, setSubjectPart] = useState(initialCustomSubject);
-  const [bodyPart, setBodyPart]       = useState(initialCustomBody);
+  const [bodyPart,    setBodyPart]    = useState(initialCustomBody);
 
-  // whenever we call back, we stash these suffixes onto our QuestionState
+  // fetch “people I’ve emailed”
+  useEffect(() => {
+    (async () => {
+      const token = await getGraphToken();
+      if (!token) return;
+      const res = await fetch(
+        "https://graph.microsoft.com/v1.0/me/people?$select=displayName,scoredEmailAddresses,id",
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      const json = await res.json();
+      console.debug("🛠️ /me/people →", json);
+      if (Array.isArray(json.value)) {
+        setPeople(
+          json.value.filter((p: Person) =>
+            Array.isArray(p.scoredEmailAddresses) && p.scoredEmailAddresses.length > 0
+          )
+        );
+      }
+    })();
+  }, []);
+
+  // build updated Q
   const updatedQ: QuestionState = {
     ...q,
     responsibleEmail:   respEmail,
-    cc,
+    cc:                 ccList.join(","),
     sendIntervalValue:  value,
     sendIntervalUnit:   unit,
     emailsubject:       subjectPart,
@@ -47,25 +76,67 @@ const EmailSettings: React.FC<EmailSettingsProps> = ({
 
   return (
     <div className="space-y-6 text-white">
-      {/* Responsible & CC */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div>
-          <label className="block font-semibold mb-1">Responsible Email</label>
-          <input
-            type="email"
+      {/* Responsible */}
+      <div>
+        <label className="block font-semibold mb-1">Responsible</label>
+        {people.length > 0 ? (
+          <select
             className="w-full px-4 py-2 bg-white/80 text-black rounded-xl shadow-sm focus:ring-2 focus:ring-blue-400"
             value={respEmail}
             onChange={e => setRespEmail(e.target.value)}
-          />
-        </div>
-        <div>
-          <label className="block font-semibold mb-1">CC (optional)</label>
+          >
+            <option value="">— Select a person —</option>
+            {people.map(p => {
+              const mail = p.scoredEmailAddresses[0].address;
+              return (
+                <option key={p.id} value={mail}>
+                  {p.displayName} &lt;{mail}&gt;
+                </option>
+              );
+            })}
+          </select>
+        ) : (
           <input
+            type="email"
             className="w-full px-4 py-2 bg-white/80 text-black rounded-xl shadow-sm focus:ring-2 focus:ring-blue-400"
-            value={cc}
-            onChange={e => setCc(e.target.value)}
+            placeholder="Enter responsible's email…"
+            value={respEmail}
+            onChange={e => setRespEmail(e.target.value)}
           />
-        </div>
+        )}
+      </div>
+
+      {/* CC */}
+      <div>
+        <label className="block font-semibold mb-1">CC (optional)</label>
+        {people.length > 0 ? (
+          <select
+            multiple
+            size={5}
+            className="w-full px-4 py-2 bg-white/80 text-black rounded-xl shadow-sm focus:ring-2 focus:ring-blue-400"
+            value={ccList}
+            onChange={e =>
+              setCcList(Array.from(e.target.selectedOptions, o => o.value))
+            }
+          >
+            {people.map(p => {
+              const mail = p.scoredEmailAddresses[0].address;
+              return (
+                <option key={p.id} value={mail}>
+                  {p.displayName} &lt;{mail}&gt;
+                </option>
+              );
+            })}
+          </select>
+        ) : (
+          <input
+            type="text"
+            className="w-full px-4 py-2 bg-white/80 text-black rounded-xl shadow-sm focus:ring-2 focus:ring-blue-400"
+            placeholder="Comma‑separated CC emails…"
+            value={ccList.join(",")}
+            onChange={e => setCcList(e.target.value.split(",").map(s => s.trim()))}
+          />
+        )}
       </div>
 
       {/* Interval */}
@@ -98,15 +169,12 @@ const EmailSettings: React.FC<EmailSettingsProps> = ({
       <div>
         <label className="block font-semibold mb-1">Subject</label>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-          {/* fixed prefix (readonly) */}
           <input
-            type="text"
             readOnly
             disabled
             className="w-full px-4 py-2 bg-white/60 text-black rounded-xl shadow-sm"
             value={fixedSubject}
           />
-          {/* custom suffix */}
           <input
             type="text"
             className="w-full px-4 py-2 bg-white/80 text-black rounded-xl shadow-sm focus:ring-2 focus:ring-blue-400"
@@ -120,7 +188,6 @@ const EmailSettings: React.FC<EmailSettingsProps> = ({
       {/* Body */}
       <div>
         <label className="block font-semibold mb-1">Body</label>
-        {/* fixed intro */}
         <textarea
           readOnly
           disabled
@@ -128,7 +195,6 @@ const EmailSettings: React.FC<EmailSettingsProps> = ({
           rows={3}
           value={fixedBody}
         />
-        {/* custom body */}
         <textarea
           className="w-full px-4 py-2 bg-white/80 text-black rounded-xl shadow-sm focus:ring-2 focus:ring-blue-400"
           rows={5}

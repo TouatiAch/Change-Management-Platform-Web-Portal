@@ -22,15 +22,10 @@ import { ScrapPieChart } from "./scrap/ScrapPieChart";
 import { UnplannedDowntimeChart } from "./downtime/UnplannedDowntimeChart";
 import DraxlOverview from "./changes/DraxlOverview";
 import { ChangeStatusSemiPieChart } from "./phase 4 closure/ChangeStatusSemiPieChart";
-import { FollowupCostTimeSeriesChart } from "./followupcost/FollowupCostTimeSeriesChart";
 import { FollowupCostByProjectReasonChart } from "./followupcost/FollowupCostByProjectReasonChart";
-import { FollowupCostByReasonTimeSeriesChart } from "./followupcost/FollowupCostByReasonTimeSeriesChart";
 import { FollowupCostSubProjectChart } from "./followupcost/FollowupCostSubProjectChart";
-import { FollowupCostProjectTimeSeriesChart } from "./followupcost/FollowupCostProjectTimeSeriesChart";
-import type { ListConfig } from "../../services/configService";
 import DRXEntriesChart from "./drx/DRXEntriesChart";
 import BudgetEntriesChart from "./budget/BudgetEntriesChart";
-import { ProjectCostWithTargetChart } from "./followupcost/ProjectCostWithTargetChart";
 import { FollowupCostMonthlyChart } from "./followupcost/FollowupCostMonthlyChart";
 import { FollowupCostByReasonMonthlyChart } from "./followupcost/FollowupCostByReasonMonthlyChart";
 import { MonthlyTargetTableContainer } from "./followupcost/MonthlyTargetTableContainer";
@@ -57,22 +52,6 @@ const filterModes: { key: FilterMode; label: string }[] = [
   { key: "weekOfYear", label: "Week of Year" },
   { key: "customRange", label: "Custom Range" },
 ];
-
-interface IProject {
-  id: string;
-  displayName: string;
-  mapping: {
-    implementation: string;
-    implementationExtra?: string;
-  };
-}
-
-interface cmConfigLists {
-   siteId: string;
-   questionsListId: string;
-   lists: ListConfig[];         // ← holds your downtime, DRX, Budgets, FollowCostKPI, etc.
-   projects: IProject[];
- }
 
 interface ChangeItem {
   ID: string;
@@ -134,8 +113,6 @@ type FilterMode =
 export const ChangesDashboard: React.FC = () => {
   
   const { project } = useParams<{ project: string }>();
-const [projects, setProjects] = useState<IProject[]>([]);
-
   // API Source button state
   const [selectedApi, setSelectedApi] = useState<
     "changes" | "unplannedDowntime" | "costPA" | "drxIdea" | "budget" | "scrap" | "closurePhase4" 
@@ -171,32 +148,11 @@ const ALL_PROJECTS = config.projects
   .map(p => p.displayName)
   .concat("draxlameir");
 
-// at the top of your component, after defining ALL_PROJECTS
-const initialRawInputs = Object.fromEntries(
-  ALL_PROJECTS.map(p => [p, Array(12).fill("0")])
-);
 const initialNumericTargets = Object.fromEntries(
   ALL_PROJECTS.map(p => [p, Array(12).fill(0)])
 );
 
-const [rawInputs, setRawInputs] = useState(initialRawInputs);
-const [numericTargets, setNumericTargets] = useState(initialNumericTargets);
-
-// on blur, commit to numericTargets
-const handleCellBlur = (project: string, mi: number) => {
-  const parsed = parseInt(rawInputs[project][mi].trim(), 10) || 0;
-  setNumericTargets(n => ({
-    ...n,
-    [project]: n[project].map((old, i) => (i === mi ? parsed : old)),
-  }));
-};
-
-const handleRawChange = (project: string, mi: number, val: string) => {
-  setRawInputs(r => ({
-    ...r,
-    [project]: r[project].map((old, i) => (i === mi ? val : old)),
-  }));
-};
+const [numericTargets,] = useState(initialNumericTargets);
 
   // State for week-of-month/week-of-year
   const [selectedWeekOfMonth, setSelectedWeekOfMonth] = useState<number | null>(null);
@@ -668,11 +624,7 @@ ALL_PROJECTS.forEach(proj => {
 
           {/* --- CLOSURE PHASE 4 --- */}
           {selectedApi === "closurePhase4" && (
-            <>
-            <div className="bg-white rounded-lg shadow-md p-6 col-span-2">
-           <ChangeStatusSemiPieChart items={filteredItems} />
-         </div>
-     
+            <> 
   <div className="bg-white rounded-lg shadow-md p-6 col-span-2">
   <ProjectPhase4DaysTable
     projects={config.projects}
@@ -696,7 +648,6 @@ ALL_PROJECTS.forEach(proj => {
 </div>
   </>
 )}
-
           {/* --- UNPLANNED DOWNTIME --- */}
           {selectedApi === "unplannedDowntime" && (
             <div className="bg-white rounded-lg shadow-md p-6 col-span-2">

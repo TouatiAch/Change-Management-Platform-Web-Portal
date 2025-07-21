@@ -102,9 +102,6 @@ export const graphService = {
         conversationId:     s["conversationid"]     || "",
         internetMessageId:  s["internetmessageid"]  || "",
         lastChecked:        s["lastchecked"]        || "",
-        replySubject:       s["replysubject"]       || "",
-        replyBody:          s["replybody"]          || "",
-        replyReceivedDate:  s["replyreceiveddate"]  || "",
       } as QuestionState;
     });
   },

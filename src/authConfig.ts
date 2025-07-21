@@ -29,6 +29,7 @@ export const graphTokenRequest = {
     "https://graph.microsoft.com/offline_access",
     "https://graph.microsoft.com/Sites.Read.All",
     "https://graph.microsoft.com/Sites.ReadWrite.All",
-    "https://graph.microsoft.com/Sites.Manage.All"
+    "https://graph.microsoft.com/Sites.Manage.All",
+    "https://graph.microsoft.com/People.Read"
   ],
 };
